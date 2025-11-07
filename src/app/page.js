@@ -12,6 +12,186 @@ const LPPivotGenerator = () => {
   const [pivotOptions, setPivotOptions] = useState([]);
   const [selectedPivot, setSelectedPivot] = useState(null);
   const [generatedLP, setGeneratedLP] = useState(null);
+  const [sharing, setSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState(''); 
+  const [showShareModal, setShowShareModal] = useState(false);
+
+// 共有機能（Vercel Blob使用）
+const shareLP = async () => {
+  if (!generatedLP || sharing) return;
+
+  setSharing(true);
+
+  try {
+    // LPをBlobに保存
+    const response = await fetch('/api/save-lp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(generatedLP)
+    });
+
+    if (!response.ok) {
+      throw new Error('保存に失敗しました');
+    }
+
+    const { id, blobUrl, data } = await response.json();
+    
+    // 保存したデータをlocalStorageにも保存
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`lp-${id}`, JSON.stringify(data));
+    }
+    
+    const generatedShareUrl = `${window.location.origin}/lp/${id}`;
+    setShareUrl(generatedShareUrl);  // URLを保存
+    setShowShareModal(true);  // モーダルを表示
+
+  } catch (error) {
+    console.error('Share error:', error);
+    alert('共有に失敗しました: ' + error.message);
+  } finally {
+    setSharing(false);
+  }
+};
+
+
+// HTMLダウンロード機能
+const downloadHTML = () => {
+  if (!generatedLP) return;
+
+  // LP全体のHTMLを生成
+  const htmlContent = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${generatedLP.serviceName}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  <!-- ヒーローセクション -->
+  <section class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center">
+      <h1 class="text-5xl font-bold mb-6">${generatedLP.serviceName}</h1>
+      <p class="text-2xl mb-8 opacity-90">${generatedLP.catchphrase}</p>
+      <button class="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-4 px-8 rounded-lg text-lg transition-colors">
+        ${generatedLP.ctaText}
+      </button>
+    </div>
+  </section>
+
+  <!-- 問題提起 -->
+  <section class="py-16 px-4 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12 text-gray-900">こんな課題はありませんか?</h2>
+      <div class="grid md:grid-cols-3 gap-6">
+        ${generatedLP.problems.map(problem => `
+          <div class="bg-white p-6 rounded-xl shadow-md">
+            <p class="text-gray-700 text-center">${problem}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </section>
+
+  <!-- ソリューション -->
+  <section class="py-16 px-4">
+    <div class="max-w-4xl mx-auto text-center">
+      <h2 class="text-3xl font-bold mb-6 text-gray-900">解決策</h2>
+      <p class="text-xl text-gray-700 leading-relaxed">${generatedLP.solution}</p>
+    </div>
+  </section>
+
+  <!-- 主要機能 -->
+  <section class="py-16 px-4 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12 text-gray-900">主要機能</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        ${generatedLP.features.map(feature => `
+          <div class="text-center">
+            <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+              </svg>
+            </div>
+            <h3 class="text-xl font-bold mb-2 text-gray-900">${feature.title}</h3>
+            <p class="text-gray-600">${feature.description}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </section>
+
+  <!-- 差別化ポイント -->
+  <section class="py-16 px-4">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12 text-gray-900">3つの強み</h2>
+      <div class="space-y-4">
+        ${generatedLP.strengths.map(strength => `
+          <div class="flex items-center gap-4 p-4 bg-indigo-50 rounded-lg">
+            <svg class="w-6 h-6 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <p class="text-lg text-gray-800">${strength}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </section>
+
+  <!-- 使い方 -->
+  <section class="py-16 px-4 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-bold text-center mb-12 text-gray-900">簡単3ステップ</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        ${generatedLP.steps.map((step, idx) => `
+          <div class="text-center">
+            <div class="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
+              ${idx + 1}
+            </div>
+            <h3 class="text-xl font-bold mb-2 text-gray-900">${step.title}</h3>
+            <p class="text-gray-600">${step.description}</p>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  </section>
+
+  <!-- 最終CTA -->
+  <section class="py-20 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+    <div class="max-w-4xl mx-auto text-center">
+      <h2 class="text-4xl font-bold mb-6">今すぐ始めましょう</h2>
+      <p class="text-xl mb-8 opacity-90">無料で試せます</p>
+      <button class="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-4 px-8 rounded-lg text-lg transition-colors">
+        ${generatedLP.ctaText}
+      </button>
+    </div>
+  </section>
+
+  <!-- フッター -->
+  <footer class="py-8 px-4 bg-gray-900 text-white">
+    <div class="max-w-4xl mx-auto text-center">
+      <p class="text-gray-400">© 2025 ${generatedLP.serviceName}. All rights reserved.</p>
+    </div>
+  </footer>
+</body>
+</html>`;
+
+  // Blobを作成してダウンロード
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${generatedLP.serviceName.replace(/\s+/g, '-')}-LP.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+
 
   // API呼び出し用の関数
   const callAPI = async (endpoint, data) => {
@@ -105,9 +285,8 @@ const LPPivotGenerator = () => {
       <div className="max-w-2xl w-full">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Sparkles className="w-12 h-12 text-indigo-600" />
+            <img src="/image/logo.png" alt="LP PIVOT" className="h-24 w-auto" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">LP Pivot Generator</h1>
           <p className="text-lg text-gray-600">
             競合サービスを分析して、差別化されたアイデアのLPを自動生成
           </p>
@@ -123,7 +302,7 @@ const LPPivotGenerator = () => {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://example.com"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
               onKeyPress={(e) => e.key === 'Enter' && analyzeURL()}
             />
           </div>
@@ -166,7 +345,21 @@ const LPPivotGenerator = () => {
   );
 
   // ステップ2: ピボット案選択
-  const renderStep2 = () => (
+const renderStep2 = () => {
+  // ピボット案をカテゴリごとにグループ化
+  const groupedPivots = {
+    '顧客対象をピボット': [],
+    '技術・課題をピボット': [],
+    '大胆にピボット': []
+  };
+  
+  pivotOptions.forEach(pivot => {
+    if (groupedPivots[pivot.category]) {
+      groupedPivots[pivot.category].push(pivot);
+    }
+  });
+
+  return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4 py-8">
       <div className="max-w-6xl mx-auto">
         <button
@@ -185,10 +378,21 @@ const LPPivotGenerator = () => {
                 <p className="text-sm font-medium text-gray-500 mb-1">サービス名</p>
                 <p className="text-lg font-semibold text-gray-900">{analyzedData.serviceName}</p>
               </div>
-              <div>
+              
+              {analyzedData.category && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">カテゴリ</p>
+                  <span className="inline-block bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-semibold">
+                    {analyzedData.category}
+                  </span>
+                </div>
+              )}
+              
+              <div className="md:col-span-2">
                 <p className="text-sm font-medium text-gray-500 mb-1">ターゲット顧客</p>
                 <p className="text-gray-700">{analyzedData.targetCustomer}</p>
               </div>
+              
               <div className="md:col-span-2">
                 <p className="text-sm font-medium text-gray-500 mb-1">主要機能</p>
                 <ul className="list-disc list-inside text-gray-700 space-y-1">
@@ -197,6 +401,7 @@ const LPPivotGenerator = () => {
                   ))}
                 </ul>
               </div>
+              
               <div className="md:col-span-2">
                 <p className="text-sm font-medium text-gray-500 mb-1">提供価値</p>
                 <p className="text-gray-700">{analyzedData.valueProposition}</p>
@@ -205,205 +410,510 @@ const LPPivotGenerator = () => {
           )}
         </div>
 
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
           <Lightbulb className="w-7 h-7 text-yellow-500" />
           ピボット案を選択してください
         </h2>
+        <p className="text-gray-600 mb-8">3つのカテゴリから、合計6つの差別化案を提案します</p>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            {pivotOptions.map((pivot, idx) => (
-              <div key={idx} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow border-2 border-transparent hover:border-indigo-200">
-                <div className="flex items-start gap-3 mb-4">
-                  <Target className="w-6 h-6 text-indigo-600 flex-shrink-0 mt-1" />
-                  <h3 className="text-xl font-bold text-gray-900">{pivot.title}</h3>
+          <div className="space-y-10">
+            {/* カテゴリ1: 顧客対象をピボット */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-lg">1</span>
                 </div>
-                
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-500 mb-2">差別化ポイント</p>
-                  <ul className="space-y-1">
-                    {pivot.differentiators.map((diff, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                        {diff}
-                      </li>
-                    ))}
-                  </ul>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">顧客対象をピボット</h3>
+                  <p className="text-sm text-gray-600">技術は維持、ターゲット顧客を変更</p>
                 </div>
-
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-500 mb-1">想定ターゲット</p>
-                  <p className="text-sm text-gray-700">{pivot.targetAudience}</p>
-                </div>
-
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-500 mb-1">元サービスとの違い</p>
-                  <p className="text-sm text-gray-700">{pivot.difference}</p>
-                </div>
-
-                <button
-                  onClick={() => generateLP(pivot)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
-                >
-                  この案でLP生成
-                  <ArrowRight className="w-4 h-4" />
-                </button>
               </div>
-            ))}
+              <div className="grid md:grid-cols-2 gap-6">
+                {groupedPivots['顧客対象をピボット'].map((pivot, idx) => (
+                  <PivotCard key={idx} pivot={pivot} onSelect={() => generateLP(pivot)} />
+                ))}
+              </div>
+            </div>
+
+            {/* カテゴリ2: 技術・課題をピボット */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-green-600 font-bold text-lg">2</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">技術・課題をピボット</h3>
+                  <p className="text-sm text-gray-600">顧客は維持、技術や解決課題を変更</p>
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                {groupedPivots['技術・課題をピボット'].map((pivot, idx) => (
+                  <PivotCard key={idx} pivot={pivot} onSelect={() => generateLP(pivot)} />
+                ))}
+              </div>
+            </div>
+
+            {/* カテゴリ3: 大胆にピボット */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-purple-600 font-bold text-lg">3</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">大胆にピボット</h3>
+                  <p className="text-sm text-gray-600">コンセプトを活かし、大きく方向転換</p>
+                </div>
+              </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                {groupedPivots['大胆にピボット'].map((pivot, idx) => (
+                  <PivotCard key={idx} pivot={pivot} onSelect={() => generateLP(pivot)} />
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
     </div>
   );
+};
+
+// ピボットカードコンポーネント
+const PivotCard = ({ pivot, onSelect }) => (
+  <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow border-2 border-transparent hover:border-indigo-200">
+    <div className="flex items-start gap-3 mb-4">
+      <Target className="w-6 h-6 text-indigo-600 flex-shrink-0 mt-1" />
+      <h3 className="text-xl font-bold text-gray-900">{pivot.title}</h3>
+    </div>
+    
+    <div className="mb-4">
+      <p className="text-sm font-medium text-gray-500 mb-2">差別化ポイント</p>
+      <ul className="space-y-1">
+        {pivot.differentiators.map((diff, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+            {diff}
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <div className="mb-4">
+      <p className="text-sm font-medium text-gray-500 mb-1">想定ターゲット</p>
+      <p className="text-sm text-gray-700">{pivot.targetAudience}</p>
+    </div>
+
+    <div className="mb-4">
+      <p className="text-sm font-medium text-gray-500 mb-1">元サービスとの違い</p>
+      <p className="text-sm text-gray-700">{pivot.difference}</p>
+    </div>
+
+    <button
+      onClick={onSelect}
+      className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+    >
+      この案でLP生成
+      <ArrowRight className="w-4 h-4" />
+    </button>
+  </div>
+);
 
   // ステップ3: LP表示
   const renderStep3 = () => {
-    if (loading || !generatedLP) {
-      return (
-        <div className="min-h-screen bg-white flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-            <p className="text-lg text-gray-600">LPを生成中...</p>
-          </div>
-        </div>
-      );
-    }
-
+  if (loading || !generatedLP) {
     return (
-      <div className="min-h-screen bg-white">
-        <div className="bg-indigo-600 text-white p-4 sticky top-0 z-10 shadow-lg">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setStep(2)}
-                className="flex items-center gap-2 hover:bg-indigo-700 px-3 py-2 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                別の案を選ぶ
-              </button>
-              <button
-                onClick={reset}
-                className="flex items-center gap-2 hover:bg-indigo-700 px-3 py-2 rounded-lg transition-colors"
-              >
-                <RefreshCw className="w-4 h-4" />
-                最初から
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="flex items-center gap-2 bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-colors font-medium">
-                <Download className="w-4 h-4" />
-                ダウンロード
-              </button>
-              <button className="flex items-center gap-2 bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-colors font-medium">
-                <Share2 className="w-4 h-4" />
-                共有
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-6xl mx-auto">
-          <section className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-20 px-4">
-            <div className="max-w-4xl mx-auto text-center">
-              <h1 className="text-5xl font-bold mb-6">{generatedLP.serviceName}</h1>
-              <p className="text-2xl mb-8 opacity-90">{generatedLP.catchphrase}</p>
-              <button className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-4 px-8 rounded-lg text-lg transition-colors">
-                {generatedLP.ctaText}
-              </button>
-            </div>
-          </section>
-
-          <section className="py-16 px-4 bg-gray-50">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">こんな課題はありませんか?</h2>
-              <div className="grid md:grid-cols-3 gap-6">
-                {generatedLP.problems.map((problem, idx) => (
-                  <div key={idx} className="bg-white p-6 rounded-xl shadow-md">
-                    <p className="text-gray-700 text-center">{problem}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="py-16 px-4">
-            <div className="max-w-4xl mx-auto text-center">
-              <h2 className="text-3xl font-bold mb-6 text-gray-900">解決策</h2>
-              <p className="text-xl text-gray-700 leading-relaxed">{generatedLP.solution}</p>
-            </div>
-          </section>
-
-          <section className="py-16 px-4 bg-gray-50">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">主要機能</h2>
-              <div className="grid md:grid-cols-3 gap-8">
-                {generatedLP.features.map((feature, idx) => (
-                  <div key={idx} className="text-center">
-                    <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Sparkles className="w-8 h-8 text-indigo-600" />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2 text-gray-900">{feature.title}</h3>
-                    <p className="text-gray-600">{feature.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="py-16 px-4">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">3つの強み</h2>
-              <div className="space-y-4">
-                {generatedLP.strengths.map((strength, idx) => (
-                  <div key={idx} className="flex items-center gap-4 p-4 bg-indigo-50 rounded-lg">
-                    <CheckCircle className="w-6 h-6 text-indigo-600 flex-shrink-0" />
-                    <p className="text-lg text-gray-800">{strength}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="py-16 px-4 bg-gray-50">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">簡単3ステップ</h2>
-              <div className="grid md:grid-cols-3 gap-8">
-                {generatedLP.steps.map((step, idx) => (
-                  <div key={idx} className="text-center">
-                    <div className="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-                      {idx + 1}
-                    </div>
-                    <h3 className="text-xl font-bold mb-2 text-gray-900">{step.title}</h3>
-                    <p className="text-gray-600">{step.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <section className="py-20 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-            <div className="max-w-4xl mx-auto text-center">
-              <h2 className="text-4xl font-bold mb-6">今すぐ始めましょう</h2>
-              <p className="text-xl mb-8 opacity-90">無料で試せます</p>
-              <button className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-4 px-8 rounded-lg text-lg transition-colors">
-                {generatedLP.ctaText}
-              </button>
-            </div>
-          </section>
-
-          <footer className="py-8 px-4 bg-gray-900 text-white">
-            <div className="max-w-4xl mx-auto text-center">
-              <p className="text-gray-400">© 2025 {generatedLP.serviceName}. All rights reserved.</p>
-            </div>
-          </footer>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
+          <p className="text-lg text-gray-600">LPを生成中...</p>
         </div>
       </div>
     );
-  };
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* 操作バー */}
+      <div className="bg-gray-100 text-gray-900 p-4 sticky top-0 z-10 shadow-lg border-b border-gray-200">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setStep(2)}
+              className="flex items-center gap-2 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors text-gray-900"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              別の案を選ぶ
+            </button>
+            <button
+              onClick={reset}
+              className="flex items-center gap-2 hover:bg-gray-200 px-3 py-2 rounded-lg transition-colors text-gray-900"
+            >
+              <RefreshCw className="w-4 h-4" />
+              最初から
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={downloadHTML}
+              className="flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 px-4 py-2 rounded-lg transition-colors font-medium"
+            >
+              <Download className="w-4 h-4" />
+              ダウンロード
+            </button>
+            <button 
+              onClick={shareLP}
+              disabled={sharing}
+              className="flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors font-medium"
+            >
+              {sharing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  保存中...
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" />
+                  共有
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* LP内容 */}
+      <div className="max-w-6xl mx-auto">
+        {/* ヒーローセクション */}
+        <section className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-20 px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-5xl font-bold mb-6">{generatedLP.serviceName}</h1>
+            <p className="text-2xl mb-8 opacity-90">{generatedLP.catchphrase}</p>
+            <button className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-4 px-8 rounded-lg text-lg transition-colors">
+              {generatedLP.ctaText}
+            </button>
+          </div>
+        </section>
+
+        {/* 問題提起 */}
+        <section className="py-16 px-4 bg-gray-50">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">こんな課題はありませんか?</h2>
+            <div className="grid md:grid-cols-3 gap-6">
+              {generatedLP.problems.map((problem, idx) => (
+                <div key={idx} className="bg-white p-6 rounded-xl shadow-md">
+                  <p className="text-gray-700 text-center">{problem}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ソリューション */}
+        <section className="py-16 px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-6 text-gray-900">解決策</h2>
+            <p className="text-xl text-gray-700 leading-relaxed">{generatedLP.solution}</p>
+          </div>
+        </section>
+
+        {/* 具体的な利用シーン */}
+        {generatedLP.useCases && (
+          <section className="py-16 px-4 bg-gray-50">
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-3xl font-bold text-center mb-4 text-gray-900">こんな場面で活躍</h2>
+              <p className="text-center text-gray-600 mb-12">実際の利用シーンをご紹介します</p>
+              <div className="space-y-8">
+                {generatedLP.useCases.map((useCase, idx) => (
+                  <div key={idx} className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-indigo-600">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-indigo-600 font-bold text-xl">{idx + 1}</span>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">{useCase.title}</h3>
+                        <p className="text-sm text-indigo-600 font-medium mb-3">{useCase.persona}</p>
+                        <div className="bg-gray-50 rounded-lg p-4 mb-3">
+                          <p className="text-sm font-medium text-gray-500 mb-1">状況:</p>
+                          <p className="text-gray-700">{useCase.situation}</p>
+                        </div>
+                        <div className="bg-green-50 rounded-lg p-4">
+                          <p className="text-sm font-medium text-green-700 mb-1">結果:</p>
+                          <p className="text-gray-900 font-semibold">{useCase.result}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* 主要機能 */}
+        <section className="py-16 px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">主要機能</h2>
+            <div className="grid md:grid-cols-3 gap-8">
+              {generatedLP.features.map((feature, idx) => (
+                <div key={idx} className="text-center">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-8 h-8 text-indigo-600" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2 text-gray-900">{feature.title}</h3>
+                  <p className="text-gray-600">{feature.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ビフォー・アフター比較 */}
+        {generatedLP.beforeAfter && (
+          <section className="py-16 px-4 bg-gradient-to-r from-gray-50 to-indigo-50">
+            <div className="max-w-5xl mx-auto">
+              <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">導入前と導入後の違い</h2>
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">導入前</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    {generatedLP.beforeAfter.before.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-3">
+                        <span className="text-red-500 flex-shrink-0 mt-1">●</span>
+                        <span className="text-gray-700">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-indigo-200">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">導入後</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    {generatedLP.beforeAfter.after.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-3">
+                        <span className="text-green-500 flex-shrink-0 mt-1">●</span>
+                        <span className="text-gray-700 font-medium">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* 差別化ポイント */}
+        <section className="py-16 px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">3つの強み</h2>
+            <div className="space-y-4">
+              {generatedLP.strengths.map((strength, idx) => (
+                <div key={idx} className="flex items-center gap-4 p-4 bg-indigo-50 rounded-lg">
+                  <CheckCircle className="w-6 h-6 text-indigo-600 flex-shrink-0" />
+                  <p className="text-lg text-gray-800">{strength}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* 1日の業務フロー */}
+        {generatedLP.dailyWorkflow && (
+          <section className="py-16 px-4 bg-gray-50">
+            <div className="max-w-4xl mx-auto">
+              <h2 className="text-3xl font-bold text-center mb-4 text-gray-900">1日の業務フロー</h2>
+              <p className="text-center text-gray-600 mb-12">実際の1日の使い方をイメージしてみましょう</p>
+              
+              <div className="relative">
+                {/* タイムライン */}
+                <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-indigo-200 hidden md:block"></div>
+                
+                <div className="space-y-8">
+                  {generatedLP.dailyWorkflow.map((flow, idx) => (
+                    <div key={idx} className="relative md:pl-20">
+                      <div className="md:absolute left-0 w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center text-white font-bold mb-4 md:mb-0 mx-auto md:mx-0">
+                        <span className="text-sm">{flow.time.split('（')[0]}</span>
+                      </div>
+                      <div className="bg-white rounded-xl shadow-md p-6">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-2 gap-2">
+                          <h3 className="text-lg font-bold text-gray-900">{flow.task}</h3>
+                          <span className="text-sm font-semibold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full self-start">
+                            {flow.duration}
+                          </span>
+                        </div>
+                        <p className="text-gray-600 text-sm">{flow.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* 最終CTA */}
+        <section className="py-20 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-4xl font-bold mb-6">今すぐ始めましょう</h2>
+            <p className="text-xl mb-8 opacity-90">無料で試せます</p>
+            <button className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-4 px-8 rounded-lg text-lg transition-colors">
+              {generatedLP.ctaText}
+            </button>
+          </div>
+        </section>
+
+        {/* フッター */}
+        <footer className="py-8 px-4 bg-gray-900 text-white">
+          <div className="max-w-4xl mx-auto text-center">
+            <p className="text-gray-400">© 2025 {generatedLP.serviceName}. All rights reserved.</p>
+          </div>
+        </footer>
+      </div>
+
+{/* ブランディングセクション（LP Pivot Generator） */}
+<section className="py-12 px-4 bg-gradient-to-r from-indigo-50 to-purple-50 border-t-2 border-indigo-100">
+  <div className="max-w-4xl mx-auto">
+    <div className="bg-white rounded-2xl shadow-lg p-8 border border-indigo-100">
+      <div className="flex flex-col md:flex-row items-center gap-6">
+      
+        {/* テキストエリア */}
+        <div className="flex-1 text-center md:text-left">
+          <a 
+            href="https://lp-pivot.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-block group"
+          >
+          <div className="flex items-center justify-center mb-4">
+            <img src="/image/logo.png" alt="LP PIVOT" className="h-24 w-auto" />
+          </div>
+          </a>
+          <p className="text-gray-600 mb-4">
+            このランディングページは、競合サービスを分析して差別化されたアイデアを自動生成する
+            <span className="font-semibold text-indigo-600"> LP PIVOT </span>
+            で作成されました。
+          </p>
+        </div>
+      </div>
+
+      {/* 機能紹介 */}
+      <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="grid md:grid-cols-3 gap-4 text-center">
+          <div className="flex flex-col items-center">
+            <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center mb-2">
+              <Target className="w-5 h-5 text-indigo-600" />
+            </div>
+            <p className="text-sm font-semibold text-gray-700">競合分析</p>
+            <p className="text-xs text-gray-500">URLから自動分析</p>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mb-2">
+              <Lightbulb className="w-5 h-5 text-purple-600" />
+            </div>
+            <p className="text-sm font-semibold text-gray-700">ピボット案生成</p>
+            <p className="text-xs text-gray-500">6つの差別化案</p>
+          </div>
+          <div className="flex flex-col items-center">
+            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mb-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            </div>
+            <p className="text-sm font-semibold text-gray-700">LP自動生成</p>
+            <p className="text-xs text-gray-500">1分で完成</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+      {/* 共有URLモーダル */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-2xl font-bold text-gray-900">共有URL</h3>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              以下のURLでLPを共有できます
+            </p>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-900 break-all font-mono">
+                {shareUrl}
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(shareUrl);
+                  alert('URLをコピーしました！');
+                }}
+                className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+              >
+                URLをコピー
+              </button>
+
+              {navigator.share && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.share({
+                        title: generatedLP.serviceName,
+                        text: generatedLP.catchphrase,
+                        url: shareUrl,
+                      });
+                    } catch (error) {
+                      if (error.name !== 'AbortError') {
+                        console.error('Share error:', error);
+                      }
+                    }
+                  }}
+                  className="flex-1 bg-gray-900 text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                >
+                  共有メニュー
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => window.open(shareUrl, '_blank')}
+              className="w-full mt-3 text-indigo-600 hover:text-indigo-700 py-2 text-sm font-medium"
+            >
+              新しいタブで開く →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
   return (
     <>
