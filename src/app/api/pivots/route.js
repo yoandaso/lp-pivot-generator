@@ -25,6 +25,16 @@ export async function POST(request) {
 - ターゲット: ${analyzed.targetCustomer}
 - 価値: ${analyzed.valueProposition}
 
+【顧客面での評価点】
+${analyzed.customerAnalysis.strengths.join('\n- ')}
+【顧客面での課題】
+${analyzed.customerAnalysis.challenges.join('\n- ')}
+
+【サービス面での評価点】
+${analyzed.serviceAnalysis.strengths.join('\n- ')}
+【サービス面での課題】
+${analyzed.serviceAnalysis.challenges.join('\n- ')}
+
 【ピボットの3つのカテゴリ】
 
 ■ カテゴリ1: 顧客対象をピボット（2案生成）

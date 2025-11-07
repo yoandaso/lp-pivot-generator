@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Loader2, ArrowRight, ArrowLeft, Download, Share2, RefreshCw, Sparkles, Target, Lightbulb, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowRight, ArrowLeft, Download, Share2, RefreshCw, Sparkles, Target, Lightbulb, CheckCircle, Users, Zap, TrendingUp, AlertCircle } from 'lucide-react';
 
 const LPPivotGenerator = () => {
   const [step, setStep] = useState(1);
@@ -340,6 +340,149 @@ const downloadHTML = () => {
             </ol>
           </div>
         </div>
+      <div className="text-center mb-8">
+      </div>
+      {/* 活用シーンガイド */}
+      <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            こんな時に使えます
+          </h2>
+          <p className="text-gray-600">
+            新規事業の検証から、既存サービスのピボットまで
+          </p>
+        </div>
+
+        {/* 実績・信頼要素（オプション） */}
+        <div className="mt-6 grid grid-cols-3 gap-4 text-center">
+          <div>
+            <p className="text-2xl font-bold text-indigo-600">1分</p>
+            <p className="text-xs text-gray-600">で完成</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-indigo-600">6案</p>
+            <p className="text-xs text-gray-600">の提案</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-indigo-600">無料</p>
+            <p className="text-xs text-gray-600">登録不要</p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* ユースケース1: MVP作成 */}
+          <div className="group hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 p-6 rounded-xl transition-all border-2 border-transparent hover:border-indigo-100">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Lightbulb className="w-7 h-7 text-white" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  新規事業のアイデア検証
+                </h3>
+                <p className="text-gray-700 mb-3">
+                  <span className="font-semibold text-indigo-600">「顧客にぶつけるMVPが欲しい」</span>
+                </p>
+                <p className="text-gray-600 text-sm leading-relaxed mb-3">
+                  競合サービスを分析して、差別化ポイントを明確にしたモックLPを1分で作成。
+                  顧客インタビューや社内プレゼンで、具体的なビジョンを共有できます。
+                </p>
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-gray-600">開発前に市場反応を確認</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm mt-1">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-gray-600">投資家へのピッチ資料として活用</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ユースケース2: アイデア発想 */}
+          <div className="group hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 p-6 rounded-xl transition-all border-2 border-transparent hover:border-indigo-100">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Sparkles className="w-7 h-7 text-white" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  アイデアに詰まった時の発想支援
+                </h3>
+                <p className="text-gray-700 mb-3">
+                  <span className="font-semibold text-purple-600">「良いアイデアが思い浮かばない」</span>
+                </p>
+                <p className="text-gray-600 text-sm leading-relaxed mb-3">
+                  既存サービスから6つの異なる切り口でピボット案を自動生成。
+                  「顧客を変える」「技術を変える」「大胆に変える」の3軸で、新しい視点を提供します。
+                </p>
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-gray-600">思考の壁を突破するきっかけに</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm mt-1">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-gray-600">ブレストの材料として最適</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ユースケース3: ピボット検討 */}
+          <div className="group hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 p-6 rounded-xl transition-all border-2 border-transparent hover:border-indigo-100">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Target className="w-7 h-7 text-white" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">
+                  既存サービスのピボット方向性
+                </h3>
+                <p className="text-gray-700 mb-3">
+                  <span className="font-semibold text-green-600">「今のサービスがうまくいかない」</span>
+                </p>
+                <p className="text-gray-600 text-sm leading-relaxed mb-3">
+                  自社サービスのURLを入力すれば、客観的な視点でピボット案を提案。
+                  「ターゲットを変える」「機能を絞る」など、具体的な方向性が見えてきます。
+                </p>
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-gray-600">経営判断の材料として活用</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm mt-1">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <span className="text-gray-600">チームでピボット方針を議論</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CTAエリア */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 text-white text-center">
+            <p className="text-lg font-semibold mb-2">
+              💡 まずは試してみませんか？
+            </p>
+            <p className="text-sm opacity-90 mb-4">
+              完全無料・登録不要で、今すぐ使えます
+            </p>
+            <button
+              onClick={() => document.querySelector('input[type="text"]').focus()}
+              className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-3 px-8 rounded-lg transition-colors shadow-lg"
+            >
+              上に戻って試してみる ↑
+            </button>
+          </div>
+        </div>
+
+      </div>        
       </div>
     </div>
   );
@@ -370,45 +513,123 @@ const renderStep2 = () => {
           戻る
         </button>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">元サービスの分析結果</h2>
-          {analyzedData && (
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-500 mb-1">サービス名</p>
-                <p className="text-lg font-semibold text-gray-900">{analyzedData.serviceName}</p>
-              </div>
-              
-              {analyzedData.category && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">カテゴリ</p>
-                  <span className="inline-block bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-semibold">
-                    {analyzedData.category}
-                  </span>
-                </div>
-              )}
-              
-              <div className="md:col-span-2">
-                <p className="text-sm font-medium text-gray-500 mb-1">ターゲット顧客</p>
-                <p className="text-gray-700">{analyzedData.targetCustomer}</p>
-              </div>
-              
-              <div className="md:col-span-2">
-                <p className="text-sm font-medium text-gray-500 mb-1">主要機能</p>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  {analyzedData.features.map((feature, idx) => (
-                    <li key={idx}>{feature}</li>
-                  ))}
-                </ul>
-              </div>
-              
-              <div className="md:col-span-2">
-                <p className="text-sm font-medium text-gray-500 mb-1">提供価値</p>
-                <p className="text-gray-700">{analyzedData.valueProposition}</p>
-              </div>
-            </div>
-          )}
+<div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+  <h2 className="text-2xl font-bold text-gray-900 mb-2">元サービスの分析結果</h2>
+  {analyzedData && (
+    <>
+      {/* 基本情報 */}
+      <div className="mb-6 pb-6 border-b border-gray-200">
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <p className="text-sm font-medium text-gray-500 mb-1">サービス名</p>
+            <p className="text-lg font-semibold text-gray-900">{analyzedData.serviceName}</p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500 mb-1">ターゲット顧客</p>
+            <p className="text-gray-700">{analyzedData.targetCustomer}</p>
+          </div>
         </div>
+        <div className="mb-4">
+          <p className="text-sm font-medium text-gray-500 mb-1">提供価値</p>
+          <p className="text-gray-700">{analyzedData.valueProposition}</p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-500 mb-2">主要機能</p>
+          <div className="flex flex-wrap gap-2">
+            {analyzedData.features.map((feature, idx) => (
+              <span key={idx} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-sm">
+                {feature}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ビジネス分析セクション */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* 顧客分析 */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-blue-600" />
+            <h3 className="text-lg font-bold text-gray-900">顧客について</h3>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                <h4 className="font-semibold text-gray-800 text-sm">評価できる点</h4>
+              </div>
+              <ul className="space-y-2">
+                {analyzedData.customerAnalysis.strengths.map((strength, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>{strength}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-orange-600" />
+                <h4 className="font-semibold text-gray-800 text-sm">課題</h4>
+              </div>
+              <ul className="space-y-2">
+                {analyzedData.customerAnalysis.challenges.map((challenge, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                    <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <span>{challenge}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* サービス・技術分析 */}
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Zap className="w-5 h-5 text-purple-600" />
+            <h3 className="text-lg font-bold text-gray-900">サービス・技術について</h3>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUp className="w-4 h-4 text-green-600" />
+                <h4 className="font-semibold text-gray-800 text-sm">評価できる点</h4>
+              </div>
+              <ul className="space-y-2">
+                {analyzedData.serviceAnalysis.strengths.map((strength, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                    <span>{strength}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-orange-600" />
+                <h4 className="font-semibold text-gray-800 text-sm">課題</h4>
+              </div>
+              <ul className="space-y-2">
+                {analyzedData.serviceAnalysis.challenges.map((challenge, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                    <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <span>{challenge}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  )}
+</div>
 
         <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
           <Lightbulb className="w-7 h-7 text-yellow-500" />
