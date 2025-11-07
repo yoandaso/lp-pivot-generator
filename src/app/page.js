@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { Loader2, ArrowRight, ArrowLeft, Download, Share2, RefreshCw, Sparkles, Target, Lightbulb, CheckCircle, Users, Zap, TrendingUp, AlertCircle } from 'lucide-react';
-import { track } from '@vercel/analytics';
 
 const LPPivotGenerator = () => {
   const [step, setStep] = useState(1);
@@ -17,6 +16,27 @@ const LPPivotGenerator = () => {
   const [shareUrl, setShareUrl] = useState(''); 
   const [showShareModal, setShowShareModal] = useState(false);
 
+  const LPPivotGenerator = () => {
+  // ... 既存のuseState ...
+
+  // ログ送信用の関数を追加
+  const logEvent = async (eventName, eventData) => {
+    try {
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: eventName,
+          data: eventData
+        })
+      });
+    } catch (error) {
+      // エラーは無視（ユーザー体験に影響しないように）
+      console.error('Log error:', error);
+    }
+  };
+
+  
 // 共有機能（Vercel Blob使用）
 const shareLP = async () => {
   if (!generatedLP || sharing) return;
@@ -239,8 +259,8 @@ const analyzeURL = async () => {
     return;
   }
 
-  // トラッキング
-  track('analyze_button_clicked', {
+  // ログを記録（awaitなし = 非同期で実行）
+  logEvent('analyze_button_clicked', {
     url: url,
     timestamp: new Date().toISOString()
   });
@@ -254,14 +274,14 @@ const analyzeURL = async () => {
     await generatePivots(analyzed);
     setStep(2);
     
-    // 成功トラッキング
-    track('analyze_success', { url: url });
+    // 成功ログ
+    logEvent('analyze_success', { url: url });
   } catch (err) {
     setError('分析に失敗しました。もう一度お試しください。');
     console.error(err);
     
-    // 失敗トラッキング
-    track('analyze_failed', { 
+    // 失敗ログ
+    logEvent('analyze_failed', { 
       url: url, 
       error: err.message 
     });

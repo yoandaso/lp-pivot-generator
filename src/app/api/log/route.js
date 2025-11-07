@@ -1,21 +1,11 @@
-import { sql } from '@vercel/postgres';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
     const { event, data } = await request.json();
     
-    // データベースに保存
-    await sql`
-      INSERT INTO event_logs (event, data, timestamp, user_agent, ip)
-      VALUES (
-        ${event}, 
-        ${JSON.stringify(data)}, 
-        ${new Date().toISOString()}, 
-        ${request.headers.get('user-agent')},
-        ${request.headers.get('x-forwarded-for')}
-      )
-    `;
+    // コンソールに出力（Vercel Logsで確認可能）
+    console.log('📊 EVENT:', event, 'DATA:', JSON.stringify(data));
     
     return NextResponse.json({ success: true });
   } catch (error) {
