@@ -183,7 +183,7 @@ export default function SharedLP() {
         {/* テキストエリア */}
         <div className="flex-1 text-center md:text-left">
           <a 
-            href="https://lp-pivot.com" 
+            href="https://www.lp-pivot.com" 
             target="_blank" 
             rel="noopener noreferrer"
             className="inline-block group"
