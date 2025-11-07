@@ -233,13 +233,13 @@ const analyzeURL = async () => {
     return;
   }
 
-  const urlPattern = /^(https?:\/\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$/;
+  const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
   if (!urlPattern.test(url)) {
     setError('有効なURLを入力してください');
     return;
   }
 
-  // トラッキング（await不要）
+  // トラッキング
   track('analyze_button_clicked', {
     url: url,
     timestamp: new Date().toISOString()
