@@ -239,8 +239,8 @@ const analyzeURL = async () => {
     return;
   }
 
-  // 🆕 ログを記録
-  await logEvent('analyze_button_clicked', {
+  // トラッキング（await不要）
+  track('analyze_button_clicked', {
     url: url,
     timestamp: new Date().toISOString()
   });
@@ -254,14 +254,14 @@ const analyzeURL = async () => {
     await generatePivots(analyzed);
     setStep(2);
     
-    // 🆕 成功ログ
-    await logEvent('analyze_success', { url: url });
+    // 成功トラッキング
+    track('analyze_success', { url: url });
   } catch (err) {
     setError('分析に失敗しました。もう一度お試しください。');
     console.error(err);
     
-    // 🆕 失敗ログ
-    await logEvent('analyze_failed', { 
+    // 失敗トラッキング
+    track('analyze_failed', { 
       url: url, 
       error: err.message 
     });
