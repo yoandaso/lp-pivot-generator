@@ -442,13 +442,13 @@ const downloadHTML = () => {
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  既存サービスのピボット方向性
+                  既存サービスのピボットや事業拡張の方向性
                 </h3>
                 <p className="text-gray-700 mb-3">
-                  <span className="font-semibold text-green-600">「今のサービスがうまくいかない」</span>
+                  <span className="font-semibold text-green-600">「今のサービスがうまくいかない」「周辺領域に展開したい」</span>
                 </p>
                 <p className="text-gray-600 text-sm leading-relaxed mb-3">
-                  自社サービスのURLを入力すれば、客観的な視点でピボット案を提案。
+                  自社サービスのURLを入力すれば、客観的な視点でピボット・事業拡張案を提案。
                   「ターゲットを変える」「機能を絞る」など、具体的な方向性が見えてきます。
                 </p>
                 <div className="flex items-center gap-2 text-sm">
