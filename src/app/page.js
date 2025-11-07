@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Loader2, ArrowRight, ArrowLeft, Download, Share2, RefreshCw, Sparkles, Target, Lightbulb, CheckCircle, Users, Zap, TrendingUp, AlertCircle } from 'lucide-react';
+import { track } from '@vercel/analytics';
 
 const LPPivotGenerator = () => {
   const [step, setStep] = useState(1);
@@ -193,6 +194,23 @@ const downloadHTML = () => {
 
 
 
+// ログ送信用の関数を追加
+const logEvent = async (eventName, eventData) => {
+  try {
+    await fetch('/api/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event: eventName,
+        data: eventData
+      })
+    });
+  } catch (error) {
+    console.error('Log error:', error);
+  }
+};
+
+
   // API呼び出し用の関数
   const callAPI = async (endpoint, data) => {
     const response = await fetch(`/api/${endpoint}`, {
@@ -209,33 +227,48 @@ const downloadHTML = () => {
   };
 
   // URL分析
-  const analyzeURL = async () => {
-    if (!url.trim()) {
-      setError('URLを入力してください');
-      return;
-    }
+const analyzeURL = async () => {
+  if (!url.trim()) {
+    setError('URLを入力してください');
+    return;
+  }
 
-    const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
-    if (!urlPattern.test(url)) {
-      setError('有効なURLを入力してください');
-      return;
-    }
+  const urlPattern = /^(https?:\/\/)?([\\da-z\\.-]+)\\.([a-z\\.]{2,6})([\\/\\w \\.-]*)*\\/?$/;
+  if (!urlPattern.test(url)) {
+    setError('有効なURLを入力してください');
+    return;
+  }
 
-    setLoading(true);
-    setError('');
+  // 🆕 ログを記録
+  await logEvent('analyze_button_clicked', {
+    url: url,
+    timestamp: new Date().toISOString()
+  });
 
-    try {
-      const analyzed = await callAPI('analyze', { url });
-      setAnalyzedData(analyzed);
-      await generatePivots(analyzed);
-      setStep(2);
-    } catch (err) {
-      setError('分析に失敗しました。もう一度お試しください。');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  setError('');
+
+  try {
+    const analyzed = await callAPI('analyze', { url });
+    setAnalyzedData(analyzed);
+    await generatePivots(analyzed);
+    setStep(2);
+    
+    // 🆕 成功ログ
+    await logEvent('analyze_success', { url: url });
+  } catch (err) {
+    setError('分析に失敗しました。もう一度お試しください。');
+    console.error(err);
+    
+    // 🆕 失敗ログ
+    await logEvent('analyze_failed', { 
+      url: url, 
+      error: err.message 
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ピボット案生成
   const generatePivots = async (analyzed) => {
