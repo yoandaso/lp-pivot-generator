@@ -61,7 +61,7 @@ export async function POST(request) {
     console.log('Redis save result:', result);
     
     // URLの生成
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://lp-pivot-generator.vercel.app';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://lp-pivot.com';
     const url = `${baseUrl}/lp/${id}`;
     console.log('Generated URL:', url);
     
