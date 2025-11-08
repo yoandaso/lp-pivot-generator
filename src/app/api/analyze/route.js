@@ -7,7 +7,7 @@ async function callClaudeWithRetry(anthropic, messages, maxRetries = 5) {
       console.log(`Attempt ${i + 1}/${maxRetries}`);
       
       const message = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-20241022',  // Haikuに変更
+        model: 'claude-3-5-haiku-20241022',
         max_tokens: 2000,
         messages,
       });
@@ -17,7 +17,7 @@ async function callClaudeWithRetry(anthropic, messages, maxRetries = 5) {
       console.error(`Attempt ${i + 1} failed:`, error.message);
       
       if (error.error?.type === 'overloaded_error' && i < maxRetries - 1) {
-        const waitTime = Math.pow(2, i) * 5000; // 5秒, 10秒, 20秒, 40秒, 80秒
+        const waitTime = Math.pow(2, i) * 5000;
         console.log(`Waiting ${waitTime}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
@@ -96,4 +96,40 @@ URL: ${url}
     
     if (!responseText) {
       console.error('Response text is empty');
-      return NextResponse.j
+      return NextResponse.json(
+        { error: 'Claude APIからのテキストが空です' },
+        { status: 500 }
+      );
+    }
+
+    let jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    console.log('Parsing JSON...');
+    const analyzedData = JSON.parse(jsonText);
+    
+    console.log('Analysis successful');
+    return NextResponse.json(analyzedData);
+
+  } catch (error) {
+    console.error('=== Analyze API Error ===');
+    console.error('Error:', error.message);
+
+    if (error.error?.type === 'overloaded_error') {
+      return NextResponse.json(
+        {
+          error: 'Anthropic APIが一時的に過負荷状態です。30秒後に再度お試しください。',
+          details: 'サーバーが混雑しています',
+        },
+        { status: 503 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: 'API呼び出しに失敗しました',
+        details: error.message,
+      },
+      { status: 500 }
+    );
+  }
+}
