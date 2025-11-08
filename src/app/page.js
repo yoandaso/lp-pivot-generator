@@ -783,12 +783,12 @@ const renderStep2_5 = () => (
         {/* 寄付ボタン */}
         <div className="space-y-3 mb-6">
           <a
-            href="https://buy.stripe.com/your-payment-link-here" // ← 実際の決済リンクに置き換え
+            href="https://yoandaso.base.shop/"
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg text-center transition-all shadow-lg hover:shadow-xl"
           >
-            💝 寄付をする（300円〜）
+            💝 寄付をする（300円）
           </a>
           
           <p className="text-xs text-gray-500 text-center">
