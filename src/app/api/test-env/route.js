@@ -3,24 +3,22 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   console.log('=== Environment Variables Test ===');
   
-  const envVars = {
-    REDIS_URL: !!process.env.REDIS_URL,
-    UPSTASH_REDIS_REST_URL: !!process.env.UPSTASH_REDIS_REST_URL,
-    UPSTASH_REDIS_REST_TOKEN: !!process.env.UPSTASH_REDIS_REST_TOKEN,
-    KV_REST_API_URL: !!process.env.KV_REST_API_URL,
-    KV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
-  };
+  // すべてのRedis/KV関連の環境変数を確認
+  const allEnvKeys = Object.keys(process.env).filter(k => 
+    k.includes('REDIS') || k.includes('UPSTASH') || k.includes('KV')
+  );
   
-  console.log('Environment variables:', envVars);
+  console.log('All Redis/KV env vars:', allEnvKeys);
   
-  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  const envVars = {};
+  allEnvKeys.forEach(key => {
+    envVars[key] = process.env[key] ? 
+      (process.env[key].substring(0, 20) + '...') : 
+      null;
+  });
   
   return NextResponse.json({
-    envVars,
-    hasUpstashUrl: !!upstashUrl,
-    hasUpstashToken: !!upstashToken,
-    upstashUrlPreview: upstashUrl ? upstashUrl.substring(0, 20) + '...' : null,
-    tokenPreview: upstashToken ? upstashToken.substring(0, 10) + '...' : null,
+    allKeys: allEnvKeys,
+    values: envVars
   });
 }
