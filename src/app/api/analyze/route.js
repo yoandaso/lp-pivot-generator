@@ -64,4 +64,58 @@ URL: ${url}
     console.log('Full response:', JSON.stringify(message, null, 2));
 
     // レスポンスの検証
-    if (!message || !message.content || !Array.isArray(message.content) || message.content.length ===
+    if (!message || !message.content || !Array.isArray(message.content) || message.content.length === 0) {
+      console.error('Invalid response format:', message);
+      return NextResponse.json(
+        { error: 'Claude APIからの応答が不正です', details: JSON.stringify(message) },
+        { status: 500 }
+      );
+    }
+
+    const responseText = message.content[0].text;
+    
+    if (!responseText) {
+      console.error('Response text is empty');
+      return NextResponse.json(
+        { error: 'Claude APIからのテキストが空です' },
+        { status: 500 }
+      );
+    }
+
+    console.log('Response text:', responseText.substring(0, 200));
+
+    // JSONの抽出
+    let jsonText = responseText;
+    
+    // マークダウンのコードブロックを削除
+    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    console.log('Parsing JSON...');
+    const analyzedData = JSON.parse(jsonText);
+    
+    console.log('Analysis successful');
+    return NextResponse.json(analyzedData);
+
+  } catch (error) {
+    console.error('=== Analyze API Error ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+
+    // Anthropic API固有のエラー
+    if (error.status) {
+      console.error('API Status:', error.status);
+      console.error('API Error:', error.error);
+    }
+
+    return NextResponse.json(
+      {
+        error: 'API呼び出しに失敗しました',
+        details: error.message,
+        type: error.name,
+        apiError: error.error || null,
+      },
+      { status: 500 }
+    );
+  }
+}
