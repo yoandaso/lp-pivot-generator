@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server';
 
-export async function GET(request, { params }) {
+export async function GET(request, context) {
   console.log('=== Get LP API Called ===');
   
   try {
+    // Next.js 15対応
+    const params = await context.params;
     const { id } = params;
+    
     console.log('Fetching LP with ID:', id);
+    
+    if (!id) {
+      return NextResponse.json(
+        { error: 'ID parameter missing' },
+        { status: 400 }
+      );
+    }
     
     // Upstash環境変数を確認
     const restUrl = process.env.UPSTASH_REDIS_REST_URL;
@@ -48,7 +58,6 @@ export async function GET(request, { params }) {
     
     if (!result.result) {
       console.error('LP not found in Redis. Key:', `lp:${id}`);
-      console.error('Full response:', result);
       return NextResponse.json(
         { error: 'LPが見つかりません' },
         { status: 404 }

@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server';
 
-export async function GET(request, { params }) {
+export async function GET(request, context) {
   console.log('=== Debug LP API Called ===');
   
   try {
+    // Next.js 15対応
+    const params = await context.params;
     const { id } = params;
+    
     console.log('Debug LP with ID:', id);
+    
+    if (!id) {
+      return NextResponse.json({
+        error: 'ID parameter missing',
+        receivedParams: params
+      }, { status: 400 });
+    }
     
     const restUrl = process.env.UPSTASH_REDIS_REST_URL;
     const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
