@@ -12,8 +12,8 @@ export async function POST(request) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-haiku-20241022',
-        max_tokens: 4000,
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4500,
         messages: [{
           role: 'user',
           content: `以下のピボット案に基づいて、具体的でイメージしやすいランディングページの内容を生成してください。
