@@ -6,12 +6,11 @@ export async function POST(request) {
   
   try {
     // Upstash環境変数を確認
-    const restUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-    const restToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+    const restUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
     
     if (!restUrl || !restToken) {
       console.error('Upstash環境変数が見つかりません');
-      console.log('Available env vars:', Object.keys(process.env).filter(k => k.includes('REDIS') || k.includes('KV')));
       return NextResponse.json(
         { error: 'Upstash環境変数が設定されていません' },
         { status: 500 }
@@ -28,21 +27,16 @@ export async function POST(request) {
     const id = nanoid(10);
     console.log('Generated ID:', id);
     
-    // Upstash REST APIで保存
+    // Upstash REST APIで保存（修正版）
     console.log('Saving to Upstash...');
     
     const redisResponse = await fetch(
-      `${restUrl}/set/lp:${id}`,
+      `${restUrl}/set/lp:${id}/${JSON.stringify(lpData)}?EX=2592000`,
       {
-        method: 'POST',
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${restToken}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          value: JSON.stringify(lpData),
-          ex: 60 * 60 * 24 * 30, // 30日間
-        }),
       }
     );
     
@@ -61,7 +55,7 @@ export async function POST(request) {
     console.log('Redis save result:', result);
     
     // URLの生成
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://lp-pivot.com';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://lp-pivot-generator.vercel.app';
     const url = `${baseUrl}/lp/${id}`;
     console.log('Generated URL:', url);
     

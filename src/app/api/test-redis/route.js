@@ -4,21 +4,13 @@ export async function GET(request) {
   console.log('=== Test Redis API Called ===');
   
   try {
-    // Upstash環境変数を確認
-    const restUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-    const restToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-    
-    console.log('Environment variables check:');
-    console.log('KV_REST_API_URL:', !!process.env.KV_REST_API_URL);
-    console.log('UPSTASH_REDIS_REST_URL:', !!process.env.UPSTASH_REDIS_REST_URL);
-    console.log('KV_REST_API_TOKEN:', !!process.env.KV_REST_API_TOKEN);
-    console.log('UPSTASH_REDIS_REST_TOKEN:', !!process.env.UPSTASH_REDIS_REST_TOKEN);
+    const restUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
     
     if (!restUrl || !restToken) {
       return NextResponse.json({
         success: false,
-        error: 'Upstash環境変数が設定されていません',
-        available: Object.keys(process.env).filter(k => k.includes('REDIS') || k.includes('KV'))
+        error: 'Upstash環境変数が設定されていません'
       });
     }
     
@@ -28,18 +20,14 @@ export async function GET(request) {
     const testKey = 'test:' + Date.now();
     const testValue = 'Hello from LP Pivot!';
     
+    // Upstash REST API の正しい形式で保存
     const saveResponse = await fetch(
-      `${restUrl}/set/${testKey}`,
+      `${restUrl}/set/${testKey}/${encodeURIComponent(testValue)}?EX=60`,
       {
-        method: 'POST',
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${restToken}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          value: testValue,
-          ex: 60
-        }),
       }
     );
     

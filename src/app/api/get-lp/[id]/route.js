@@ -8,8 +8,8 @@ export async function GET(request, { params }) {
     console.log('Fetching LP with ID:', id);
     
     // Upstash環境変数を確認
-    const restUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-    const restToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+    const restUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
     
     if (!restUrl || !restToken) {
       console.error('Upstash環境変数が見つかりません');
@@ -53,6 +53,7 @@ export async function GET(request, { params }) {
       );
     }
     
+    // JSON文字列をパース
     const lpData = JSON.parse(result.result);
     console.log('LP found successfully');
     
