@@ -31,7 +31,7 @@ export async function POST(request) {
     const dataString = JSON.stringify(lpData);
     console.log('Data size:', dataString.length, 'characters');
     
-    // Upstash REST APIで保存
+    // Upstash REST APIで保存（修正版）
     console.log('Saving to Upstash...');
     
     const redisResponse = await fetch(
@@ -42,7 +42,7 @@ export async function POST(request) {
           Authorization: `Bearer ${restToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify([dataString])
+        body: dataString  // 配列ではなく、直接文字列を送る
       }
     );
     
