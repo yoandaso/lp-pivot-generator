@@ -1,34 +1,88 @@
-import { put } from '@vercel/blob';
+import { nanoid } from 'nanoid';
 import { NextResponse } from 'next/server';
 
-function generateId() {
-  return Math.random().toString(36).substring(2, 12);
+// REDIS_URLから情報を抽出
+function parseRedisUrl(redisUrl) {
+  // redis://default:TOKEN@HOST:PORT の形式
+  const match = redisUrl.match(/redis:\/\/(.+):(.+)@(.+):(\d+)/);
+  if (!match) {
+    throw new Error('Invalid REDIS_URL format');
+  }
+  
+  return {
+    username: match[1],
+    password: match[2],
+    host: match[3],
+    port: match[4],
+    restUrl: `https://${match[3]}`
+  };
 }
 
 export async function POST(request) {
+  console.log('=== Save LP API Called ===');
+  
   try {
+    // REDIS_URLから情報を取得
+    if (!process.env.REDIS_URL) {
+      throw new Error('REDIS_URL環境変数が設定されていません');
+    }
+    
+    const { password, restUrl } = parseRedisUrl(process.env.REDIS_URL);
+    console.log('Redis REST URL:', restUrl);
+
+    // リクエストボディの取得
     const lpData = await request.json();
-    const id = generateId();
+    console.log('LP data received');
     
-    console.log('Saving LP with ID:', id);
+    // IDの生成
+    const id = nanoid(10);
+    console.log('Generated ID:', id);
     
-    const blob = await put(`lp-${id}.json`, JSON.stringify(lpData), {
-      access: 'public',
-      contentType: 'application/json',
-    });
+    // Redis REST APIで保存
+    const redisResponse = await fetch(
+      `${restUrl}/set/lp:${id}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${password}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          value: JSON.stringify(lpData),
+          ex: 60 * 60 * 24 * 30, // 30日間
+        }),
+      }
+    );
     
-    console.log('Saved successfully:', blob.url);
+    if (!redisResponse.ok) {
+      const errorText = await redisResponse.text();
+      console.error('Redis error:', errorText);
+      throw new Error('Redisへの保存に失敗しました: ' + errorText);
+    }
     
-    // URLとデータの両方を返す
-    return NextResponse.json({ 
-      id, 
-      blobUrl: blob.url,
-      data: lpData  // データも一緒に返す
+    const result = await redisResponse.json();
+    console.log('Redis save result:', result);
+    
+    // URLの生成
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://lp-pivot.com';
+    const url = `${baseUrl}/lp/${id}`;
+    console.log('Generated URL:', url);
+    
+    return NextResponse.json({
+      success: true,
+      id,
+      url,
+      data: lpData
     });
   } catch (error) {
-    console.error('Save LP error:', error);
+    console.error('=== Save LP Error ===');
+    console.error('Error:', error);
+    
     return NextResponse.json(
-      { error: 'LP保存に失敗しました', details: error.message },
+      { 
+        error: '保存に失敗しました',
+        details: error.message,
+      },
       { status: 500 }
     );
   }

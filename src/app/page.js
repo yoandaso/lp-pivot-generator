@@ -16,9 +16,6 @@ const LPPivotGenerator = () => {
   const [shareUrl, setShareUrl] = useState(''); 
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const LPPivotGenerator = () => {
-  // ... 既存のuseState ...
-
   // ログ送信用の関数を追加
   const logEvent = async (eventName, eventData) => {
     try {
@@ -37,34 +34,40 @@ const LPPivotGenerator = () => {
   };
 
   
-// 共有機能（Vercel Blob使用）
+// 共有機能
 const shareLP = async () => {
   if (!generatedLP || sharing) return;
 
   setSharing(true);
 
   try {
-    // LPをBlobに保存
+    console.log('Saving LP for sharing...');
+    
+    // LPをAPIに保存
     const response = await fetch('/api/save-lp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(generatedLP)
     });
 
+    console.log('Response status:', response.status);
+
     if (!response.ok) {
-      throw new Error('保存に失敗しました');
+      const errorData = await response.json();
+      console.error('Save LP API Error:', errorData);
+      throw new Error(errorData.details || errorData.error || '保存に失敗しました');
     }
 
-    const { id, blobUrl, data } = await response.json();
+    const { id, url, data } = await response.json();
+    console.log('LP saved successfully:', { id, url });
     
-    // 保存したデータをlocalStorageにも保存
+    // localStorageにも保存
     if (typeof window !== 'undefined') {
       localStorage.setItem(`lp-${id}`, JSON.stringify(data));
     }
     
-    const generatedShareUrl = `${window.location.origin}/lp/${id}`;
-    setShareUrl(generatedShareUrl);  // URLを保存
-    setShowShareModal(true);  // モーダルを表示
+    setShareUrl(url);
+    setShowShareModal(true);
 
   } catch (error) {
     console.error('Share error:', error);
@@ -213,22 +216,6 @@ const downloadHTML = () => {
 };
 
 
-
-// ログ送信用の関数を追加
-const logEvent = async (eventName, eventData) => {
-  try {
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event: eventName,
-        data: eventData
-      })
-    });
-  } catch (error) {
-    console.error('Log error:', error);
-  }
-};
 
 
   // API呼び出し用の関数
@@ -756,6 +743,94 @@ const renderStep2 = () => {
   );
 };
 
+// ステップ2.5: 寄付画面
+const renderStep2_5 = () => (
+  <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="max-w-2xl w-full">
+      <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12">
+        {/* ヘッダー */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <img src="/image/logo.png" alt="LP PIVOT" className="h-24 w-auto" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            からの大切なお願い
+          </h2>
+        </div>
+
+        {/* メッセージ */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-8">
+          <div className="space-y-4 text-gray-700 leading-relaxed">
+            <p className="font-semibold text-gray-900 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-indigo-600" />
+              LP PIVOTは、収益モデルを持たないハッカソン発サービスです
+            </p>
+            <p>
+              生成にはAIのトークン利用料が発生しています。現在、利用者の拡大によってトークンが不足しています。
+            </p>
+            <p className="font-semibold text-red-600">
+              1回の分析＆LP生成で数円のトークン料が発生しており、トークンが切れた場合には利用ができなくなります。
+            </p>
+            <p className="text-lg font-bold text-gray-900 mt-6">
+              もしよろしければ、トークン代のために<span className="text-indigo-600">300円から</span>少額の寄付をお願いいたします。
+            </p>
+            <p className="text-sm text-gray-600">
+              LP PIVOTのサービス継続のために、ご支援いただけますと幸いです。
+            </p>
+          </div>
+        </div>
+
+        {/* 寄付ボタン */}
+        <div className="space-y-3 mb-6">
+          <a
+            href="https://buy.stripe.com/your-payment-link-here" // ← 実際の決済リンクに置き換え
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg text-center transition-all shadow-lg hover:shadow-xl"
+          >
+            💝 寄付をする（300円〜）
+          </a>
+          
+          <p className="text-xs text-gray-500 text-center">
+            ※ 外部の決済サービスに移動します
+          </p>
+        </div>
+
+        {/* スキップボタン */}
+        <div className="border-t border-gray-200 pt-6">
+          <button
+            onClick={() => {
+              setStep(3);
+              generateLP(selectedPivot);
+            }}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors"
+          >
+            今回はスキップして生成を続ける
+            <ArrowRight className="w-4 h-4" />
+          </button>
+          <p className="text-xs text-gray-500 text-center mt-2">
+            ※ 寄付は任意です。スキップしても生成は続けられます
+          </p>
+        </div>
+
+        {/* 戻るボタン */}
+        <div className="mt-6">
+          <button
+            onClick={() => setStep(2)}
+            className="w-full text-gray-600 hover:text-gray-700 font-medium flex items-center justify-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            PIVOT案の選択に戻る
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+
+
+
 // ピボットカードコンポーネント
 const PivotCard = ({ pivot, onSelect }) => (
   <div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow border-2 border-transparent hover:border-indigo-200">
@@ -787,7 +862,10 @@ const PivotCard = ({ pivot, onSelect }) => (
     </div>
 
     <button
-      onClick={onSelect}
+      onClick={() => {
+        setSelectedPivot(pivot);
+        setStep(2.5); // 寄付画面へ
+      }}
       className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
     >
       この案でLP生成
@@ -1193,6 +1271,7 @@ const PivotCard = ({ pivot, onSelect }) => (
     <>
       {step === 1 && renderStep1()}
       {step === 2 && renderStep2()}
+      {step === 2.5 && renderStep2_5()}
       {step === 3 && renderStep3()}
     </>
   );
