@@ -20,6 +20,7 @@ export async function GET(request, { params }) {
     }
     
     console.log('Redis REST URL:', restUrl);
+    console.log('Fetching key:', `lp:${id}`);
     
     // Upstash REST APIで取得
     const redisResponse = await fetch(
@@ -43,19 +44,30 @@ export async function GET(request, { params }) {
     }
     
     const result = await redisResponse.json();
-    console.log('Redis response:', result);
+    console.log('Redis raw response:', JSON.stringify(result).substring(0, 200));
     
     if (!result.result) {
-      console.error('LP not found:', id);
+      console.error('LP not found in Redis. Key:', `lp:${id}`);
+      console.error('Full response:', result);
       return NextResponse.json(
         { error: 'LPが見つかりません' },
         { status: 404 }
       );
     }
     
-    // JSON文字列をパース
-    const lpData = JSON.parse(result.result);
-    console.log('LP found successfully');
+    // result.result は既にJSON文字列なので、パースする
+    let lpData;
+    try {
+      lpData = JSON.parse(result.result);
+      console.log('LP data parsed successfully');
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      console.error('Raw data:', result.result);
+      return NextResponse.json(
+        { error: 'データの解析に失敗しました' },
+        { status: 500 }
+      );
+    }
     
     return NextResponse.json(lpData);
   } catch (error) {
