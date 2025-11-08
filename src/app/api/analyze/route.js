@@ -1,215 +1,67 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 
-function extractImportantContent(html) {
-  // タイトル
-  const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-  const title = titleMatch ? titleMatch[1].trim() : '';
-  
-  // メタディスクリプション
-  const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i);
-  const description = descMatch ? descMatch[1].trim() : '';
-  
-  // OGディスクリプション
-  const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["']/i);
-  const ogDescription = ogDescMatch ? ogDescMatch[1].trim() : '';
-  
-  // h1タグ（すべて取得）
-  const h1Matches = html.match(/<h1[^>]*>(.*?)<\/h1>/gi) || [];
-  const h1s = h1Matches
-    .map(h => h.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
-    .filter(h => h.length > 0)
-    .join(' | ');
-  
-  // h2タグ（最初の8つ）
-  const h2Matches = html.match(/<h2[^>]*>(.*?)<\/h2>/gi) || [];
-  const h2s = h2Matches
-    .map(h => h.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
-    .filter(h => h.length > 0)
-    .slice(0, 8)
-    .join(' | ');
-  
-  // mainまたはarticleの内容
-  let mainContent = '';
-  const mainMatch = html.match(/<main[^>]*>(.*?)<\/main>/is);
-  const articleMatch = html.match(/<article[^>]*>(.*?)<\/article>/is);
-  const sectionMatch = html.match(/<section[^>]*class=["'][^"']*hero[^"']*["'][^>]*>(.*?)<\/section>/is);
-  
-  const contentSource = mainMatch || articleMatch || sectionMatch;
-  
-  if (contentSource) {
-    mainContent = contentSource[1]
-      .replace(/<script[^>]*>.*?<\/script>/gi, '')
-      .replace(/<style[^>]*>.*?<\/style>/gi, '')
-      .replace(/<nav[^>]*>.*?<\/nav>/gi, '')
-      .replace(/<footer[^>]*>.*?<\/footer>/gi, '')
-      .replace(/<header[^>]*>.*?<\/header>/gi, '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, 1500);
-  } else {
-    // mainタグがない場合、bodyから抽出
-    const bodyMatch = html.match(/<body[^>]*>(.*?)<\/body>/is);
-    if (bodyMatch) {
-      mainContent = bodyMatch[1]
-        .replace(/<script[^>]*>.*?<\/script>/gi, '')
-        .replace(/<style[^>]*>.*?<\/style>/gi, '')
-        .replace(/<nav[^>]*>.*?<\/nav>/gi, '')
-        .replace(/<footer[^>]*>.*?<\/footer>/gi, '')
-        .replace(/<header[^>]*>.*?<\/header>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .substring(0, 1500);
-    }
-  }
-  
-  // CTA（Call to Action）テキスト
-  const ctaMatches = html.match(/<button[^>]*>(.*?)<\/button>/gi) || [];
-  const ctas = ctaMatches
-    .map(c => c.replace(/<[^>]+>/g, '').trim())
-    .filter(c => c.length > 0 && c.length < 50)
-    .slice(0, 5)
-    .join(' | ');
-  
-  return `
-【タイトル】
-${title}
-
-【メタ説明】
-${description || ogDescription}
-
-【主要見出し（H1）】
-${h1s || 'なし'}
-
-【サブ見出し（H2）】
-${h2s || 'なし'}
-
-【CTAボタン】
-${ctas || 'なし'}
-
-【メインコンテンツ】
-${mainContent}
-  `.trim();
-}
-
 export async function POST(request) {
+  console.log('=== Analyze API Called ===');
+  
   try {
-    const { url } = await request.json();
-    
-    console.log('分析開始:', url);
-    
-    let websiteContent = '';
-    let fetchSuccess = false;
-    
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
-      
-      const siteResponse = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        },
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (siteResponse.ok) {
-        const html = await siteResponse.text();
-        websiteContent = extractImportantContent(html);
-        fetchSuccess = true;
-        console.log('サイト内容取得成功、文字数:', websiteContent.length);
-      }
-    } catch (fetchError) {
-      console.log('サイト取得失敗:', fetchError.message);
-      console.log('URLのみで分析を試みます');
+    // APIキーの確認
+    if (!process.env.ANTHROPIC_API_KEY) {
+      console.error('ANTHROPIC_API_KEY is not set');
+      return NextResponse.json(
+        { error: 'ANTHROPIC_API_KEY環境変数が設定されていません' },
+        { status: 500 }
+      );
     }
-    
-    // Claude APIで分析
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [{
+
+    const { url } = await request.json();
+    console.log('Analyzing URL:', url);
+
+    if (!url) {
+      return NextResponse.json(
+        { error: 'URLが指定されていません' },
+        { status: 400 }
+      );
+    }
+
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+
+    console.log('Calling Claude API...');
+
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      messages: [
+        {
           role: 'user',
-          content: `以下のウェブサイトを詳細に分析してください。
+          content: `以下のサービスのURLを分析して、JSON形式で情報を抽出してください。
 
 URL: ${url}
 
-${websiteContent ? `
-ウェブサイトから抽出した情報:
-${websiteContent}
+以下の形式でJSONを返してください（JSONのみ、他のテキストは不要）：
 
-` : '（ウェブサイトの内容を取得できませんでした。URLから推測して分析してください）'}
-
-【重要な指示】
-${fetchSuccess ? 
-  '- 上記のウェブサイト内容に実際に記載されている情報のみを使用してください\n- 推測や一般的な想定は避け、具体的に書かれている内容を抽出してください' : 
-  '- URLとドメイン名から慎重に推測してください\n- 確実でない情報は「情報不足」と記載してください'
-}
-- サービスの種類（ライティングツール、データ分析、マーケティング等）を正確に判断してください
-- ターゲット顧客は具体的に記載してください
-- 主要機能は実際に提供されている機能を列挙してください
-- 重要: 顧客分析ではビジネス的な観点（市場規模、収益性、競合状況など）、サービス分析では技術的・運用的な観点で評価してください。
-
-以下の形式のJSONで返してください（JSON以外の文字は一切含めないでください）:
 {
   "serviceName": "サービス名",
-  "features": ["具体的な機能1", "具体的な機能2", "具体的な機能3"],
-  "targetCustomer": "ターゲット顧客（例: ライター、マーケター、開発者など）",
-  "valueProposition": "提供価値の説明",
-  "category": "サービスカテゴリ（例: ライティングツール、データ分析ツール、マーケティングツールなど）"
+  "targetCustomer": "ターゲット顧客（例：中小企業の経営者、個人事業主など）",
+  "valueProposition": "提供価値（一言で）",
+  "features": ["機能1", "機能2", "機能3"],
   "customerAnalysis": {
-    "strengths": [
-      "顧客面での評価できる点1（市場規模、ターゲットの明確さ、収益性など具体的に）",
-      "顧客面での評価できる点2",
-      "顧客面での評価できる点3"
-    ],
-    "challenges": [
-      "顧客面での課題1（顧客獲得コスト、リーチの難しさなど具体的に）",
-      "顧客面での課題2",
-      "顧客面での課題3"
-    ]
+    "strengths": ["顧客セグメントの強み1", "強み2"],
+    "challenges": ["課題1", "課題2"]
   },
   "serviceAnalysis": {
-    "strengths": [
-      "サービス・技術面での評価できる点1（技術的優位性、差別化要素など具体的に）",
-      "サービス・技術面での評価できる点2",
-      "サービス・技術面での評価できる点3"
-    ],
-    "challenges": [
-      "サービス・技術面での課題1（技術的制約、運用コストなど具体的に）",
-      "サービス・技術面での課題2",
-      "サービス・技術面での課題3"
-    ]
+    "strengths": ["サービス・技術の強み1", "強み2"],
+    "challenges": ["課題1", "課題2"]
   }
-}`
-        }]
-      })
+}`,
+        },
+      ],
     });
 
-    const data = await response.json();
-    console.log('Claude API応答受信');
-    
-    const content = data.content[0].text.trim();
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const analyzed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
-    
-    console.log('分析完了:', analyzed.serviceName);
-    
-    return NextResponse.json(analyzed);
-  } catch (error) {
-    console.error('Analysis error:', error);
-    return NextResponse.json(
-      { error: '分析に失敗しました', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+    console.log('Claude API response received');
+    console.log('Full response:', JSON.stringify(message, null, 2));
+
+    // レスポンスの検証
+    if (!message || !message.content || !Array.isArray(message.content) || message.content.length ===
