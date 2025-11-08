@@ -1,37 +1,26 @@
 import { NextResponse } from 'next/server';
 
-// REDIS_URLから情報を抽出
-function parseRedisUrl(redisUrl) {
-  const match = redisUrl.match(/redis:\/\/(.+):(.+)@(.+):(\d+)/);
-  if (!match) {
-    throw new Error('Invalid REDIS_URL format');
-  }
-  
-  return {
-    username: match[1],
-    password: match[2],
-    host: match[3],
-    port: match[4],
-    restUrl: `https://${match[3]}`
-  };
-}
-
 export async function GET(request) {
   console.log('=== Test Redis API Called ===');
   
   try {
-    // 環境変数の確認
-    if (!process.env.REDIS_URL) {
+    // Upstash環境変数を確認
+    const restUrl = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+    const restToken = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+    
+    console.log('Environment variables check:');
+    console.log('KV_REST_API_URL:', !!process.env.KV_REST_API_URL);
+    console.log('UPSTASH_REDIS_REST_URL:', !!process.env.UPSTASH_REDIS_REST_URL);
+    console.log('KV_REST_API_TOKEN:', !!process.env.KV_REST_API_TOKEN);
+    console.log('UPSTASH_REDIS_REST_TOKEN:', !!process.env.UPSTASH_REDIS_REST_TOKEN);
+    
+    if (!restUrl || !restToken) {
       return NextResponse.json({
         success: false,
-        error: 'REDIS_URL not found',
-        env: Object.keys(process.env).filter(k => k.includes('REDIS'))
+        error: 'Upstash環境変数が設定されていません',
+        available: Object.keys(process.env).filter(k => k.includes('REDIS') || k.includes('KV'))
       });
     }
-    
-    console.log('REDIS_URL exists');
-    
-    const { password, restUrl } = parseRedisUrl(process.env.REDIS_URL);
     
     console.log('Testing connection to:', restUrl);
     
@@ -39,28 +28,23 @@ export async function GET(request) {
     const testKey = 'test:' + Date.now();
     const testValue = 'Hello from LP Pivot!';
     
-    console.log('Saving test key:', testKey);
-    
     const saveResponse = await fetch(
       `${restUrl}/set/${testKey}`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${password}`,
+          Authorization: `Bearer ${restToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           value: testValue,
-          ex: 60 // 1分で削除
+          ex: 60
         }),
       }
     );
     
-    console.log('Save response status:', saveResponse.status);
-    
     if (!saveResponse.ok) {
       const errorText = await saveResponse.text();
-      console.error('Save error:', errorText);
       return NextResponse.json({
         success: false,
         error: 'Save failed',
@@ -69,46 +53,33 @@ export async function GET(request) {
       });
     }
     
-    const saveResult = await saveResponse.json();
-    console.log('Save result:', saveResult);
-    
-    // テストキーを取得
-    console.log('Getting test key:', testKey);
-    
+    // 取得テスト
     const getResponse = await fetch(
       `${restUrl}/get/${testKey}`,
       {
         headers: {
-          Authorization: `Bearer ${password}`,
+          Authorization: `Bearer ${restToken}`,
         },
       }
     );
     
-    console.log('Get response status:', getResponse.status);
-    
     if (!getResponse.ok) {
       const errorText = await getResponse.text();
-      console.error('Get error:', errorText);
       return NextResponse.json({
         success: false,
         error: 'Get failed',
-        details: errorText,
-        status: getResponse.status
+        details: errorText
       });
     }
     
     const result = await getResponse.json();
-    console.log('Get result:', result);
     
     return NextResponse.json({
       success: true,
-      message: 'Redis connection successful!',
-      testKey,
+      message: 'Upstash connection successful!',
       testValue,
       retrievedValue: result.result,
-      match: result.result === testValue,
-      saveResult,
-      getResult: result
+      match: result.result === testValue
     });
     
   } catch (error) {
@@ -116,8 +87,7 @@ export async function GET(request) {
     return NextResponse.json({
       success: false,
       error: error.message,
-      type: error.name,
-      stack: error.stack
+      type: error.name
     }, { status: 500 });
   }
 }
