@@ -1,4 +1,3 @@
-import { nanoid } from 'nanoid';
 import { NextResponse } from 'next/server';
 
 // REDIS_URLから情報を抽出
@@ -17,99 +16,108 @@ function parseRedisUrl(redisUrl) {
   };
 }
 
-export async function POST(request) {
-  console.log('=== Save LP API Called ===');
+export async function GET(request) {
+  console.log('=== Test Redis API Called ===');
   
   try {
-    // REDIS_URLから情報を取得
+    // 環境変数の確認
     if (!process.env.REDIS_URL) {
-      console.error('REDIS_URL not found');
-      return NextResponse.json(
-        { error: 'REDIS_URL環境変数が設定されていません' },
-        { status: 500 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: 'REDIS_URL not found',
+        env: Object.keys(process.env).filter(k => k.includes('REDIS'))
+      });
     }
+    
+    console.log('REDIS_URL exists');
     
     const { password, restUrl } = parseRedisUrl(process.env.REDIS_URL);
-    console.log('Redis REST URL:', restUrl);
-
-    // リクエストボディの取得
-    const lpData = await request.json();
-    console.log('LP data received, keys:', Object.keys(lpData));
     
-    // IDの生成
-    const id = nanoid(10);
-    console.log('Generated ID:', id);
+    console.log('Testing connection to:', restUrl);
     
-    // Redis REST APIで保存（タイムアウト設定を追加）
-    console.log('Attempting to save to Redis...');
+    // テストキーを保存
+    const testKey = 'test:' + Date.now();
+    const testValue = 'Hello from LP Pivot!';
     
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒タイムアウト
+    console.log('Saving test key:', testKey);
     
-    try {
-      const redisResponse = await fetch(
-        `${restUrl}/set/lp:${id}`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${password}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            value: JSON.stringify(lpData),
-            ex: 60 * 60 * 24 * 30, // 30日間
-          }),
-          signal: controller.signal
-        }
-      );
-      
-      clearTimeout(timeoutId);
-      
-      console.log('Redis response status:', redisResponse.status);
-      
-      if (!redisResponse.ok) {
-        const errorText = await redisResponse.text();
-        console.error('Redis error response:', errorText);
-        throw new Error('Redisへの保存に失敗しました: ' + errorText);
+    const saveResponse = await fetch(
+      `${restUrl}/set/${testKey}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${password}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          value: testValue,
+          ex: 60 // 1分で削除
+        }),
       }
-      
-      const result = await redisResponse.json();
-      console.log('Redis save result:', result);
-      
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
-        throw new Error('Redis接続がタイムアウトしました');
-      }
-      throw fetchError;
+    );
+    
+    console.log('Save response status:', saveResponse.status);
+    
+    if (!saveResponse.ok) {
+      const errorText = await saveResponse.text();
+      console.error('Save error:', errorText);
+      return NextResponse.json({
+        success: false,
+        error: 'Save failed',
+        details: errorText,
+        status: saveResponse.status
+      });
     }
     
-    // URLの生成
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://lp-pivot.com';
-    const url = `${baseUrl}/lp/${id}`;
-    console.log('Generated URL:', url);
+    const saveResult = await saveResponse.json();
+    console.log('Save result:', saveResult);
+    
+    // テストキーを取得
+    console.log('Getting test key:', testKey);
+    
+    const getResponse = await fetch(
+      `${restUrl}/get/${testKey}`,
+      {
+        headers: {
+          Authorization: `Bearer ${password}`,
+        },
+      }
+    );
+    
+    console.log('Get response status:', getResponse.status);
+    
+    if (!getResponse.ok) {
+      const errorText = await getResponse.text();
+      console.error('Get error:', errorText);
+      return NextResponse.json({
+        success: false,
+        error: 'Get failed',
+        details: errorText,
+        status: getResponse.status
+      });
+    }
+    
+    const result = await getResponse.json();
+    console.log('Get result:', result);
     
     return NextResponse.json({
       success: true,
-      id,
-      url,
-      data: lpData
+      message: 'Redis connection successful!',
+      testKey,
+      testValue,
+      retrievedValue: result.result,
+      match: result.result === testValue,
+      saveResult,
+      getResult: result
     });
     
   } catch (error) {
-    console.error('=== Save LP Error ===');
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    
-    return NextResponse.json(
-      { 
-        error: '保存に失敗しました',
-        details: error.message,
-        type: error.name
-      },
-      { status: 500 }
-    );
+    console.error('Test Redis Error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error.message,
+      type: error.name,
+      stack: error.stack
+    }, { status: 500 });
   }
 }
