@@ -8,7 +8,7 @@ async function callClaudeWithRetry(anthropic, messages, maxRetries = 5) {
       
       const message = await anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 3000,
+        max_tokens: 4000,
         messages,
       });
       
