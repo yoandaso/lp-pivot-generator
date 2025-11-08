@@ -27,16 +27,22 @@ export async function POST(request) {
     const id = nanoid(10);
     console.log('Generated ID:', id);
     
-    // Upstash REST APIで保存（修正版）
+    // データをJSON文字列に変換
+    const dataString = JSON.stringify(lpData);
+    console.log('Data size:', dataString.length, 'characters');
+    
+    // Upstash REST APIで保存
     console.log('Saving to Upstash...');
     
     const redisResponse = await fetch(
-      `${restUrl}/set/lp:${id}/${JSON.stringify(lpData)}?EX=2592000`,
+      `${restUrl}/set/lp:${id}?EX=2592000`,
       {
-        method: 'GET',
+        method: 'POST',
         headers: {
           Authorization: `Bearer ${restToken}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify([dataString])
       }
     );
     
