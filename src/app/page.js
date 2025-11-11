@@ -292,43 +292,37 @@ const analyzeURL = async () => {
   };
 
   // LP生成
-  問題: APIに pivot と analyzedData を送っていますが、APIは serviceName, targetCustomer, selectedPivot を期待しています。
+  const generateLP = async (pivot) => {
+    setSelectedPivot(pivot);
+    setLoading(true);
+    setStep(3);
 
-✅ 修正版
-src/app/page.js の generateLP 関数を以下のように修正してください：
-javascript// LP生成
-const generateLP = async (pivot) => {
-  setSelectedPivot(pivot);
-  setLoading(true);
-  setStep(3);
+    try {
+      console.log('Generating LP with data:', {
+        serviceName: analyzedData?.serviceName,
+        targetCustomer: analyzedData?.targetCustomer,
+        selectedPivot: pivot
+      });
 
-  try {
-    console.log('Generating LP with data:', {
-      serviceName: analyzedData?.serviceName,
-      targetCustomer: analyzedData?.targetCustomer,
-      selectedPivot: pivot
-    });
+      if (!analyzedData?.serviceName) {
+        throw new Error('サービス名が見つかりません');
+      }
 
-    // データの検証
-    if (!analyzedData?.serviceName) {
-      throw new Error('サービス名が見つかりません');
+      const lp = await callAPI('generate-lp', {
+        serviceName: analyzedData.serviceName,
+        targetCustomer: analyzedData.targetCustomer,
+        selectedPivot: pivot
+      });
+      
+      setGeneratedLP(lp);
+    } catch (err) {
+      setError('LP生成に失敗しました: ' + err.message);
+      console.error('LP generation error:', err);
+      setStep(2);
+    } finally {
+      setLoading(false);
     }
-
-    const lp = await callAPI('generate-lp', {
-      serviceName: analyzedData.serviceName,
-      targetCustomer: analyzedData.targetCustomer,
-      selectedPivot: pivot
-    });
-    
-    setGeneratedLP(lp);
-  } catch (err) {
-    setError('LP生成に失敗しました: ' + err.message);
-    console.error('LP generation error:', err);
-    setStep(2); // エラー時はステップ2に戻る
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // リセット
   const reset = () => {
@@ -903,7 +897,7 @@ const PivotCard = ({ pivot, onSelect }) => (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-lg text-gray-600">LPを生成中...<br>（1分くらいかかります）</></p>
+          <p className="text-lg text-gray-600">LPを生成中...<br />（1分くらいかかります）</></p>
         </div>
       </div>
     );
