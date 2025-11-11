@@ -804,7 +804,7 @@ const renderStep2_5 = () => (
             rel="noopener noreferrer"
             className="block w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-lg text-center transition-all shadow-lg hover:shadow-xl"
           >
-            <span>💝 寄付をする（300円）</span>
+            💝 寄付をする（300円）
           </a>
           
           <p className="text-xs text-gray-500 text-center">
