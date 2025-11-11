@@ -798,7 +798,7 @@ const renderStep2_5 = () => (
 
         {/* 寄付ボタン */}
         <div className="space-y-3 mb-6">
-          <a
+          
             href="https://yoandaso.base.shop/"
             target="_blank"
             rel="noopener noreferrer"
@@ -812,12 +812,38 @@ const renderStep2_5 = () => (
           </p>
         </div>
 
-        {/* スキップボタン */}
+        {/* スキップボタン - 修正版 */}
         <div className="border-t border-gray-200 pt-6">
           <button
-            onClick={() => {
+            onClick={async () => {
               setStep(3);
-              generateLP(selectedPivot);
+              setLoading(true);
+              
+              try {
+                console.log('Generating LP from donation screen with data:', {
+                  serviceName: analyzedData?.serviceName,
+                  targetCustomer: analyzedData?.targetCustomer,
+                  selectedPivot: selectedPivot
+                });
+
+                if (!analyzedData?.serviceName) {
+                  throw new Error('サービス名が見つかりません');
+                }
+
+                const lp = await callAPI('generate-lp', {
+                  serviceName: analyzedData.serviceName,
+                  targetCustomer: analyzedData.targetCustomer,
+                  selectedPivot: selectedPivot
+                });
+                
+                setGeneratedLP(lp);
+              } catch (err) {
+                setError('LP生成に失敗しました: ' + err.message);
+                console.error('LP generation error:', err);
+                setStep(2);
+              } finally {
+                setLoading(false);
+              }
             }}
             className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-colors"
           >
