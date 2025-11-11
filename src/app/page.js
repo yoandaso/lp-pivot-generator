@@ -798,7 +798,7 @@ const renderStep2_5 = () => (
 
         {/* 寄付ボタン */}
         <div className="space-y-3 mb-6">
-          
+          <a
             href="https://yoandaso.base.shop/"
             target="_blank"
             rel="noopener noreferrer"
