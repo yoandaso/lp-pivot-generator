@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Loader2, ArrowRight, ArrowLeft, Download, Share2, RefreshCw, Sparkles, Target, Lightbulb, CheckCircle, Users, Zap, TrendingUp, AlertCircle } from 'lucide-react';
-import LPRenderer from '../components/LPRenderer';
+import LPRenderer from '@/components/LPRenderer';
 
 const LPPivotGenerator = () => {
   const [step, setStep] = useState(1);

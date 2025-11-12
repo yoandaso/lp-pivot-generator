@@ -2,7 +2,7 @@
 
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import LPRenderer from '../../components/LPRenderer';
+import LPRenderer from '@/components/LPRenderer';
 
 export default function SharedLP() {
   const params = useParams();
