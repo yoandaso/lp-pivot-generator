@@ -15,7 +15,7 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     console.log('=== Get LP API Called ===');
     console.log('LP ID:', id);
     console.log('Redis available:', !!redis);
