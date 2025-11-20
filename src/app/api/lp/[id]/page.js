@@ -130,8 +130,8 @@ export default function SharedLPPage() {
       {/* LPRendererでLP本体を表示 */}
       <LPRenderer 
         lpData={lpData}
-        showToolbar={false}  // 共有版ではツールバーを非表示
-        showFloatingCTA={true}  // フローティングCTAは表示
+        showToolbar={false}
+        showFloatingCTA={true}
       />
 
       {/* フッター（共有版専用） */}
