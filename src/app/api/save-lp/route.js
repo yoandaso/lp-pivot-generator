@@ -1,87 +1,113 @@
-import { nanoid } from 'nanoid';
 import { NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
+
+// Upstash Redisクライアントの初期化（環境変数がある場合）
+let redis = null;
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+}
+
+// メモリストレージ（Redisが使えない場合のフォールバック）
+const memoryStorage = new Map();
+
+// ランダムIDを生成
+function generateId() {
+  return Math.random().toString(36).substring(2, 15) + 
+         Math.random().toString(36).substring(2, 15);
+}
 
 export async function POST(request) {
-  console.log('=== Save LP API Called ===');
-  
   try {
-    // Upstash環境変数を確認
-    const restUrl = process.env.UPSTASH_REDIS_REST_URL;
-    const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    console.log('=== Save LP API Called ===');
     
-    if (!restUrl || !restToken) {
-      console.error('Upstash環境変数が見つかりません');
-      return NextResponse.json(
-        { error: 'Upstash環境変数が設定されていません' },
-        { status: 500 }
-      );
-    }
-    
-    console.log('Redis REST URL:', restUrl);
-
-    // リクエストボディの取得
     const lpData = await request.json();
-    console.log('LP data received');
     
-    // IDの生成
-    const id = nanoid(10);
-    console.log('Generated ID:', id);
-    
-    // データをJSON文字列に変換
-    const dataString = JSON.stringify(lpData);
-    console.log('Data size:', dataString.length, 'characters');
-    
-    // Upstash REST APIで保存（修正版）
-    console.log('Saving to Upstash...');
-    
-    const redisResponse = await fetch(
-      `${restUrl}/set/lp:${id}?EX=2592000`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${restToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: dataString  // 配列ではなく、直接文字列を送る
-      }
-    );
-    
-    console.log('Redis response status:', redisResponse.status);
-    
-    if (!redisResponse.ok) {
-      const errorText = await redisResponse.text();
-      console.error('Redis error:', errorText);
+    if (!lpData || !lpData.serviceName) {
       return NextResponse.json(
-        { error: 'Redisへの保存に失敗しました', details: errorText },
-        { status: 500 }
+        { error: '無効なLPデータです', details: 'serviceName is required' },
+        { status: 400 }
       );
     }
+
+    // ユニークIDを生成
+    const id = generateId();
     
-    const result = await redisResponse.json();
-    console.log('Redis save result:', result);
+    // 7日間の有効期限（秒単位）
+    const expirationSeconds = 7 * 24 * 60 * 60; // 7 days
     
-    // URLの生成
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://lp-pivot.com';
-    const url = `${baseUrl}/lp/${id}`;
-    console.log('Generated URL:', url);
-    
+    console.log('Generated ID:', id);
+    console.log('LP Data:', { serviceName: lpData.serviceName });
+
+    // Redisに保存（利用可能な場合）
+    if (redis) {
+      try {
+        await redis.set(`lp:${id}`, JSON.stringify(lpData), {
+          ex: expirationSeconds,
+        });
+        console.log('LP saved to Redis successfully');
+      } catch (redisError) {
+        console.error('Redis save error:', redisError);
+        // Redisエラーの場合はメモリストレージにフォールバック
+        memoryStorage.set(id, {
+          data: lpData,
+          expiresAt: Date.now() + (expirationSeconds * 1000)
+        });
+        console.log('Fallback to memory storage');
+      }
+    } else {
+      // Redisが利用できない場合はメモリストレージを使用
+      memoryStorage.set(id, {
+        data: lpData,
+        expiresAt: Date.now() + (expirationSeconds * 1000)
+      });
+      console.log('Using memory storage (Redis not configured)');
+    }
+
+    // 共有URL生成
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
+                    request.headers.get('origin') || 
+                    'http://localhost:3000';
+    const shareUrl = `${baseUrl}/lp/${id}`;
+
+    console.log('Share URL:', shareUrl);
+
     return NextResponse.json({
-      success: true,
       id,
-      url,
-      data: lpData
+      url: shareUrl,
+      data: lpData,
+      expiresIn: '7日間'
     });
-    
+
   } catch (error) {
     console.error('=== Save LP Error ===');
     console.error('Error:', error);
-    
+    console.error('Stack:', error.stack);
+
     return NextResponse.json(
       { 
-        error: '保存に失敗しました',
-        details: error.message,
+        error: 'LP保存に失敗しました', 
+        details: error.message 
       },
       { status: 500 }
     );
   }
 }
+
+// メモリストレージから期限切れデータを削除（クリーンアップ）
+if (!redis) {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [id, item] of memoryStorage.entries()) {
+      if (item.expiresAt < now) {
+        memoryStorage.delete(id);
+        console.log('Expired LP removed from memory:', id);
+      }
+    }
+  }, 60 * 60 * 1000); // 1時間ごとにクリーンアップ
+}
+
+// GET用のエクスポート（メモリストレージからの取得用）
+export { memoryStorage };
