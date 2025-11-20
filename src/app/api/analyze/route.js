@@ -7,7 +7,7 @@ async function callClaudeWithRetry(anthropic, messages, maxRetries = 5) {
       console.log(`Attempt ${i + 1}/${maxRetries}`);
       
       const message = await anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20241022', // 修正: 正しいモデル名
+        model: 'claude-3-5-haiku-20241022', // ✅ Haikuモデルを使用
         max_tokens: 4000,
         messages,
       });
@@ -28,14 +28,13 @@ async function callClaudeWithRetry(anthropic, messages, maxRetries = 5) {
   }
 }
 
-// URLのコンテンツをフェッチする関数（互換性のあるタイムアウト実装）
+// URLのコンテンツをフェッチする関数
 async function fetchWebContent(url) {
   try {
     console.log('Fetching URL content:', url);
     
-    // タイムアウト用のAbortController
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     
     try {
       const response = await fetch(url, {
@@ -45,7 +44,6 @@ async function fetchWebContent(url) {
           'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
         },
         signal: controller.signal,
-        // リダイレクトを許可
         redirect: 'follow',
       });
 
@@ -78,7 +76,6 @@ export async function POST(request) {
   console.log('=== Analyze API Called ===');
   
   try {
-    // 環境変数チェック
     if (!process.env.ANTHROPIC_API_KEY) {
       console.error('ANTHROPIC_API_KEY is not set');
       return NextResponse.json(
@@ -87,7 +84,6 @@ export async function POST(request) {
       );
     }
 
-    // リクエストボディの取得
     let body;
     try {
       body = await request.json();
@@ -112,7 +108,6 @@ export async function POST(request) {
     // URLの検証
     try {
       const parsedUrl = new URL(url);
-      // httpまたはhttpsのみ許可
       if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
         return NextResponse.json(
           { error: 'httpまたはhttpsのURLを入力してください' },
@@ -147,11 +142,11 @@ export async function POST(request) {
       );
     }
 
-    // コンテンツが長すぎる場合は切り詰める（Claude APIの制限対策）
-    const maxLength = 40000; // 約40,000文字まで（トークン制限を考慮）
+    // コンテンツが長すぎる場合は切り詰める
+    const maxLength = 30000; // 30,000文字（Haikuの制限を考慮）
     if (webContent.length > maxLength) {
       console.log(`Content too long (${webContent.length} chars), truncating to ${maxLength}`);
-      webContent = webContent.substring(0, maxLength) + '\n\n[... 省略 ...]';
+      webContent = webContent.substring(0, maxLength) + '\n\n[... 以降省略 ...]';
     }
 
     const anthropic = new Anthropic({
@@ -194,14 +189,14 @@ ${webContent}
   }
 }
 
-重要: 必ず有効なJSONのみを返してください。マークダウンのコードブロック記号（\`\`\`）は不要です。`,
+重要: 必ず有効なJSONのみを返してください。マークダウンのコードブロック記号は不要です。`,
       },
     ]);
 
     console.log('Claude API response received');
 
     if (!message || !message.content || !Array.isArray(message.content) || message.content.length === 0) {
-      console.error('Invalid response format:', JSON.stringify(message));
+      console.error('Invalid response format');
       return NextResponse.json(
         { error: 'Claude APIからの応答が不正です' },
         { status: 500 }
@@ -219,9 +214,8 @@ ${webContent}
     }
 
     console.log('Response text length:', responseText.length);
-    console.log('Response preview:', responseText.substring(0, 200));
 
-    // JSONの抽出（マークダウンのコードブロックを削除）
+    // JSONの抽出
     let jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     
     console.log('Parsing JSON...');
@@ -235,7 +229,6 @@ ${webContent}
         { 
           error: 'JSONのパースに失敗しました', 
           details: parseError.message,
-          preview: jsonText.substring(0, 200)
         },
         { status: 500 }
       );
@@ -255,51 +248,55 @@ ${webContent}
 
   } catch (error) {
     console.error('=== Analyze API Error ===');
-    console.error('Error type:', error.constructor.name);
+    console.error('Error:', error);
     console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-
-    // Anthropic APIのエラー
     if (error.error) {
       console.error('Anthropic API error:', error.error);
-      
-      if (error.error.type === 'overloaded_error') {
-        return NextResponse.json(
-          {
-            error: 'Anthropic APIが一時的に過負荷状態です。30秒後に再度お試しください。',
-            details: 'サーバーが混雑しています',
-          },
-          { status: 503 }
-        );
-      }
-
-      if (error.error.type === 'authentication_error') {
-        return NextResponse.json(
-          {
-            error: 'API認証エラー',
-            details: 'ANTHROPIC_API_KEYを確認してください',
-          },
-          { status: 401 }
-        );
-      }
-
-      if (error.error.type === 'invalid_request_error') {
-        return NextResponse.json(
-          {
-            error: 'APIリクエストエラー',
-            details: error.error.message || 'リクエストパラメータを確認してください',
-          },
-          { status: 400 }
-        );
-      }
     }
 
-    // 一般的なエラー
+    if (error.error?.type === 'overloaded_error') {
+      return NextResponse.json(
+        {
+          error: 'Anthropic APIが一時的に過負荷状態です。30秒後に再度お試しください。',
+        },
+        { status: 503 }
+      );
+    }
+
+    if (error.error?.type === 'authentication_error') {
+      return NextResponse.json(
+        {
+          error: 'API認証エラー',
+          details: 'ANTHROPIC_API_KEYを確認してください',
+        },
+        { status: 401 }
+      );
+    }
+
+    if (error.error?.type === 'invalid_request_error') {
+      return NextResponse.json(
+        {
+          error: 'APIリクエストエラー',
+          details: error.error.message,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (error.error?.type === 'not_found_error') {
+      return NextResponse.json(
+        {
+          error: 'モデルが見つかりません',
+          details: error.error.message,
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: 'API呼び出しに失敗しました',
         details: error.message || '不明なエラー',
-        type: error.error?.type || 'unknown',
       },
       { status: 500 }
     );
