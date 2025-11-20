@@ -80,140 +80,38 @@ const shareLP = async () => {
 
 
 // HTMLダウンロード機能
-const downloadHTML = () => {
+const downloadHTML = async () => {
   if (!generatedLP) return;
 
-  // LP全体のHTMLを生成
-  const htmlContent = `<!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${generatedLP.serviceName}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { margin: 0; padding: 0; }
-  </style>
-</head>
-<body>
-  <!-- ヒーローセクション -->
-  <section class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-20 px-4">
-    <div class="max-w-4xl mx-auto text-center">
-      <h1 class="text-5xl font-bold mb-6">${generatedLP.serviceName}</h1>
-      <p class="text-2xl mb-8 opacity-90">${generatedLP.catchphrase}</p>
-      <button class="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-4 px-8 rounded-lg text-lg transition-colors">
-        ${generatedLP.ctaText}
-      </button>
-    </div>
-  </section>
+  try {
+    // サーバー側でHTMLを生成
+    const response = await fetch('/api/generate-html', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(generatedLP)
+    });
 
-  <!-- 問題提起 -->
-  <section class="py-16 px-4 bg-gray-50">
-    <div class="max-w-4xl mx-auto">
-      <h2 class="text-3xl font-bold text-center mb-12 text-gray-900">こんな課題はありませんか?</h2>
-      <div class="grid md:grid-cols-3 gap-6">
-        ${generatedLP.problems.map(problem => `
-          <div class="bg-white p-6 rounded-xl shadow-md">
-            <p class="text-gray-700 text-center">${problem}</p>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  </section>
+    if (!response.ok) {
+      throw new Error('HTML生成に失敗しました');
+    }
 
-  <!-- ソリューション -->
-  <section class="py-16 px-4">
-    <div class="max-w-4xl mx-auto text-center">
-      <h2 class="text-3xl font-bold mb-6 text-gray-900">解決策</h2>
-      <p class="text-xl text-gray-700 leading-relaxed">${generatedLP.solution}</p>
-    </div>
-  </section>
+    // HTMLをBlobとして取得
+    const htmlBlob = await response.blob();
+    
+    // ダウンロード
+    const url = URL.createObjectURL(htmlBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${generatedLP.serviceName.replace(/\s+/g, '-')}-LP.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 
-  <!-- 主要機能 -->
-  <section class="py-16 px-4 bg-gray-50">
-    <div class="max-w-4xl mx-auto">
-      <h2 class="text-3xl font-bold text-center mb-12 text-gray-900">主要機能</h2>
-      <div class="grid md:grid-cols-3 gap-8">
-        ${generatedLP.features.map(feature => `
-          <div class="text-center">
-            <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-              </svg>
-            </div>
-            <h3 class="text-xl font-bold mb-2 text-gray-900">${feature.title}</h3>
-            <p class="text-gray-600">${feature.description}</p>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  </section>
-
-  <!-- 差別化ポイント -->
-  <section class="py-16 px-4">
-    <div class="max-w-4xl mx-auto">
-      <h2 class="text-3xl font-bold text-center mb-12 text-gray-900">3つの強み</h2>
-      <div class="space-y-4">
-        ${generatedLP.strengths.map(strength => `
-          <div class="flex items-center gap-4 p-4 bg-indigo-50 rounded-lg">
-            <svg class="w-6 h-6 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <p class="text-lg text-gray-800">${strength}</p>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  </section>
-
-  <!-- 使い方 -->
-  <section class="py-16 px-4 bg-gray-50">
-    <div class="max-w-4xl mx-auto">
-      <h2 class="text-3xl font-bold text-center mb-12 text-gray-900">簡単3ステップ</h2>
-      <div class="grid md:grid-cols-3 gap-8">
-        ${generatedLP.steps.map((step, idx) => `
-          <div class="text-center">
-            <div class="w-12 h-12 bg-indigo-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-xl font-bold">
-              ${idx + 1}
-            </div>
-            <h3 class="text-xl font-bold mb-2 text-gray-900">${step.title}</h3>
-            <p class="text-gray-600">${step.description}</p>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  </section>
-
-  <!-- 最終CTA -->
-  <section class="py-20 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-    <div class="max-w-4xl mx-auto text-center">
-      <h2 class="text-4xl font-bold mb-6">今すぐ始めましょう</h2>
-      <p class="text-xl mb-8 opacity-90">無料で試せます</p>
-      <button class="bg-white text-indigo-600 hover:bg-indigo-50 font-bold py-4 px-8 rounded-lg text-lg transition-colors">
-        ${generatedLP.ctaText}
-      </button>
-    </div>
-  </section>
-
-  <!-- フッター -->
-  <footer class="py-8 px-4 bg-gray-900 text-white">
-    <div class="max-w-4xl mx-auto text-center">
-      <p class="text-gray-400">© 2025 ${generatedLP.serviceName}. All rights reserved.</p>
-    </div>
-  </footer>
-</body>
-</html>`;
-
-  // Blobを作成してダウンロード
-  const blob = new Blob([htmlContent], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${generatedLP.serviceName.replace(/\s+/g, '-')}-LP.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download error:', error);
+    alert('HTMLダウンロードに失敗しました');
+  }
 };
 
 
