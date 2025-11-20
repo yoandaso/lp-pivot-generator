@@ -8,6 +8,9 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
     url: process.env.UPSTASH_REDIS_REST_URL,
     token: process.env.UPSTASH_REDIS_REST_TOKEN,
   });
+  console.log('✅ Redis client initialized');
+} else {
+  console.warn('⚠️ Redis environment variables not found, using memory storage');
 }
 
 // メモリストレージ（Redisが使えない場合のフォールバック）
@@ -25,7 +28,9 @@ export async function POST(request) {
     
     const lpData = await request.json();
     
+    // データ検証
     if (!lpData || !lpData.serviceName) {
+      console.error('Invalid LP data:', lpData);
       return NextResponse.json(
         { error: '無効なLPデータです', details: 'serviceName is required' },
         { status: 400 }
@@ -39,7 +44,9 @@ export async function POST(request) {
     const expirationSeconds = 7 * 24 * 60 * 60; // 7 days
     
     console.log('Generated ID:', id);
-    console.log('LP Data:', { serviceName: lpData.serviceName });
+    console.log('Service Name:', lpData.serviceName);
+
+    let savedToRedis = false;
 
     // Redisに保存（利用可能な場合）
     if (redis) {
@@ -47,23 +54,25 @@ export async function POST(request) {
         await redis.set(`lp:${id}`, JSON.stringify(lpData), {
           ex: expirationSeconds,
         });
-        console.log('LP saved to Redis successfully');
+        console.log('✅ LP saved to Redis successfully');
+        console.log('Key:', `lp:${id}`);
+        savedToRedis = true;
       } catch (redisError) {
-        console.error('Redis save error:', redisError);
+        console.error('❌ Redis save error:', redisError);
+        console.error('Stack:', redisError.stack);
         // Redisエラーの場合はメモリストレージにフォールバック
-        memoryStorage.set(id, {
-          data: lpData,
-          expiresAt: Date.now() + (expirationSeconds * 1000)
-        });
-        console.log('Fallback to memory storage');
+        savedToRedis = false;
       }
-    } else {
-      // Redisが利用できない場合はメモリストレージを使用
+    }
+
+    // Redisに保存できなかった場合はメモリストレージを使用
+    if (!savedToRedis) {
       memoryStorage.set(id, {
         data: lpData,
         expiresAt: Date.now() + (expirationSeconds * 1000)
       });
-      console.log('Using memory storage (Redis not configured)');
+      console.log('💾 Saved to memory storage (fallback)');
+      console.log('Memory storage size:', memoryStorage.size);
     }
 
     // 共有URL生成
@@ -72,13 +81,15 @@ export async function POST(request) {
                     'http://localhost:3000';
     const shareUrl = `${baseUrl}/lp/${id}`;
 
-    console.log('Share URL:', shareUrl);
+    console.log('📤 Share URL:', shareUrl);
+    console.log('💾 Storage:', savedToRedis ? 'Redis' : 'Memory');
 
     return NextResponse.json({
       id,
       url: shareUrl,
       data: lpData,
-      expiresIn: '7日間'
+      expiresIn: '7日間',
+      storage: savedToRedis ? 'Redis' : 'Memory'
     });
 
   } catch (error) {
@@ -100,14 +111,18 @@ export async function POST(request) {
 if (!redis) {
   setInterval(() => {
     const now = Date.now();
+    let cleanedCount = 0;
     for (const [id, item] of memoryStorage.entries()) {
       if (item.expiresAt < now) {
         memoryStorage.delete(id);
-        console.log('Expired LP removed from memory:', id);
+        cleanedCount++;
       }
+    }
+    if (cleanedCount > 0) {
+      console.log(`🧹 Cleaned ${cleanedCount} expired LP(s) from memory`);
     }
   }, 60 * 60 * 1000); // 1時間ごとにクリーンアップ
 }
 
-// GET用のエクスポート（メモリストレージからの取得用）
+// GET用のエクスポート（メモリストレージをget-lpで使えるようにする）
 export { memoryStorage };

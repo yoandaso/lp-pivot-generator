@@ -21,26 +21,73 @@ export default function SharedLPPage() {
 
     console.log('Loading LP with ID:', id);
 
-    try {
-      // LocalStorageから取得（APIは使わない）
-      if (typeof window !== 'undefined') {
-        const cached = localStorage.getItem(`lp-${id}`);
-        
-        if (cached) {
-          console.log('✅ LP found in localStorage');
-          const data = JSON.parse(cached);
-          setLpData(data);
-        } else {
-          console.log('❌ LP not found in localStorage');
-          setError('not_found');
+    const loadLP = async () => {
+      try {
+        // 1. まずLocalStorageを確認（高速・キャッシュ）
+        if (typeof window !== 'undefined') {
+          const cached = localStorage.getItem(`lp-${id}`);
+          
+          if (cached) {
+            console.log('✅ LP found in localStorage (cache)');
+            const data = JSON.parse(cached);
+            setLpData(data);
+            setLoading(false);
+            return; // LocalStorageにあればここで終了
+          }
         }
+
+        // 2. LocalStorageになければAPIから取得
+        console.log('📡 Fetching LP from API...');
+        const response = await fetch(`/api/get-lp/${id}`);
+        
+        console.log('API response status:', response.status);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.log('❌ LP not found (404)');
+            setError('not_found');
+          } else {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('API Error:', errorData);
+            throw new Error(errorData.error || 'APIエラー');
+          }
+          setLoading(false);
+          return;
+        }
+
+        const data = await response.json();
+        console.log('✅ LP retrieved from API');
+        
+        // データが正しく取得できたか確認
+        if (!data || !data.serviceName) {
+          console.error('Invalid LP data:', data);
+          setError('invalid_data');
+          setLoading(false);
+          return;
+        }
+        
+        setLpData(data);
+        
+        // LocalStorageにキャッシュ（次回は高速化）
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`lp-${id}`, JSON.stringify(data));
+            console.log('💾 Cached to localStorage');
+          } catch (storageError) {
+            // LocalStorage容量エラーなどは無視
+            console.warn('LocalStorage save failed:', storageError);
+          }
+        }
+
+      } catch (err) {
+        console.error('Load error:', err);
+        setError('load_error');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Load error:', err);
-      setError('load_error');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    loadLP();
   }, [id]);
 
   // ローディング中
@@ -50,6 +97,7 @@ export default function SharedLPPage() {
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
           <p className="text-lg text-gray-600">LPを読み込み中...</p>
+          <p className="text-sm text-gray-400 mt-2">初回アクセスは数秒かかる場合があります</p>
         </div>
       </div>
     );
@@ -69,23 +117,26 @@ export default function SharedLPPage() {
           </h1>
           
           <p className="text-gray-600 mb-6 leading-relaxed">
-            このLPは見つかりませんでした。
+            {error === 'not_found' && 'このLPは存在しないか、有効期限が切れています。'}
+            {error === 'invalid_data' && 'LPデータが壊れています。'}
+            {error === 'load_error' && 'LPの読み込みに失敗しました。'}
+            {!error && 'このLPは見つかりませんでした。'}
           </p>
 
           <div className="bg-indigo-50 p-4 rounded-xl mb-6 text-left">
-            <p className="text-sm font-semibold text-indigo-900 mb-3">💡 共有URLについて</p>
+            <p className="text-sm font-semibold text-indigo-900 mb-3">💡 考えられる原因</p>
             <ul className="text-sm text-indigo-800 space-y-2">
               <li className="flex items-start gap-2">
                 <span className="text-indigo-600 font-bold">•</span>
-                <span>共有URLは、<strong>LPを生成したブラウザ</strong>でのみ開けます</span>
+                <span>URLが間違っている</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-indigo-600 font-bold">•</span>
-                <span>別のデバイスやブラウザでは開けません</span>
+                <span>LPの有効期限が切れた（7日間）</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-indigo-600 font-bold">•</span>
-                <span>ブラウザのデータを消すとLPも消えます</span>
+                <span>一時的なサーバーエラー</span>
               </li>
             </ul>
           </div>
@@ -98,8 +149,15 @@ export default function SharedLPPage() {
               自分のLPを作る
             </a>
             
+            <button
+              onClick={() => window.location.reload()}
+              className="block w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+            >
+              再読み込み
+            </button>
+            
             <p className="text-sm text-gray-500">
-              元のブラウザで開くか、新しいLPを生成してください
+              新しいLPを生成してください
             </p>
           </div>
         </div>
@@ -128,7 +186,7 @@ export default function SharedLPPage() {
         </div>
       </header>
 
-      {/* LPRendererでLP本体を表示 - 最新デザイン */}
+      {/* LPRendererでLP本体を表示 */}
       <LPRenderer 
         lpData={lpData}
         showToolbar={false}

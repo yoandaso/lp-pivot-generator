@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
+
+// Upstash Redisクライアントの初期化（環境変数がある場合）
+let redis = null;
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+}
+
+// メモリストレージ（save-lpと共有）
+import { memoryStorage } from '../../save-lp/route.js';
 
 export async function GET(request, context) {
   console.log('=== Get LP API Called ===');
   
   try {
-    // Next.js 15対応
+    // Next.js 15対応: paramsをawaitで取得
     const params = await context.params;
     const { id } = params;
     
@@ -16,72 +29,73 @@ export async function GET(request, context) {
         { status: 400 }
       );
     }
-    
-    // Upstash環境変数を確認
-    const restUrl = process.env.UPSTASH_REDIS_REST_URL;
-    const restToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-    
-    if (!restUrl || !restToken) {
-      console.error('Upstash環境変数が見つかりません');
-      return NextResponse.json(
-        { error: 'Upstash環境変数が設定されていません' },
-        { status: 500 }
-      );
-    }
-    
-    console.log('Redis REST URL:', restUrl);
-    console.log('Fetching key:', `lp:${id}`);
-    
-    // Upstash REST APIで取得
-    const redisResponse = await fetch(
-      `${restUrl}/get/lp:${id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${restToken}`,
-        },
+
+    let lpData = null;
+
+    // 1. Redisから取得を試みる
+    if (redis) {
+      try {
+        console.log('Fetching from Redis...');
+        const data = await redis.get(`lp:${id}`);
+        
+        if (data) {
+          console.log('✅ LP found in Redis');
+          // Redisから取得したデータは既にオブジェクトの場合とJSON文字列の場合がある
+          lpData = typeof data === 'string' ? JSON.parse(data) : data;
+        } else {
+          console.log('❌ LP not found in Redis');
+        }
+      } catch (redisError) {
+        console.error('Redis fetch error:', redisError);
+        // Redisエラーの場合はメモリストレージにフォールバック
       }
-    );
-    
-    console.log('Redis response status:', redisResponse.status);
-    
-    if (!redisResponse.ok) {
-      const errorText = await redisResponse.text();
-      console.error('Redis error:', errorText);
-      return NextResponse.json(
-        { error: 'Redisからの取得に失敗しました', details: errorText },
-        { status: 500 }
-      );
     }
-    
-    const result = await redisResponse.json();
-    console.log('Redis raw response:', JSON.stringify(result).substring(0, 200));
-    
-    if (!result.result) {
-      console.error('LP not found in Redis. Key:', `lp:${id}`);
+
+    // 2. Redisになければメモリストレージから取得
+    if (!lpData && memoryStorage) {
+      console.log('Checking memory storage...');
+      const memoryItem = memoryStorage.get(id);
+      
+      if (memoryItem) {
+        // 有効期限チェック
+        if (memoryItem.expiresAt > Date.now()) {
+          console.log('✅ LP found in memory storage');
+          lpData = memoryItem.data;
+        } else {
+          console.log('❌ LP expired in memory storage');
+          memoryStorage.delete(id);
+        }
+      } else {
+        console.log('❌ LP not found in memory storage');
+      }
+    }
+
+    // 3. どこにもなければ404
+    if (!lpData) {
+      console.error('LP not found anywhere. ID:', id);
       return NextResponse.json(
         { error: 'LPが見つかりません' },
         { status: 404 }
       );
     }
-    
-    // result.result は既にJSON文字列なので、パースする
-    let lpData;
-    try {
-      lpData = JSON.parse(result.result);
-      console.log('LP data parsed successfully');
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      console.error('Raw data:', result.result);
+
+    // データの検証
+    if (!lpData.serviceName) {
+      console.error('Invalid LP data structure:', lpData);
       return NextResponse.json(
-        { error: 'データの解析に失敗しました' },
+        { error: 'LPデータが壊れています' },
         { status: 500 }
       );
     }
+
+    console.log('✅ LP retrieved successfully:', lpData.serviceName);
     
     return NextResponse.json(lpData);
+
   } catch (error) {
     console.error('=== Get LP Error ===');
     console.error('Error:', error);
+    console.error('Stack:', error.stack);
     
     return NextResponse.json(
       { error: 'LP取得に失敗しました', details: error.message },
