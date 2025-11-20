@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 
-// Upstash Redisクライアントの初期化（環境変数がある場合）
+// Redis Cloud クライアントの初期化（環境変数がある場合）
 let redis = null;
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+if (process.env.REDIS_URL) {
+  redis = new Redis(process.env.REDIS_URL, {
+    // エラー時の再接続設定
+    retryStrategy(times) {
+      const delay = Math.min(times * 50, 2000);
+      return delay;
+    },
+    // 接続タイムアウト
+    connectTimeout: 10000,
   });
-  console.log('✅ Redis client initialized');
+  console.log('✅ Redis Cloud client initialized');
 } else {
-  console.warn('⚠️ Redis environment variables not found, using memory storage');
+  console.warn('⚠️ REDIS_URL not found, using memory storage');
 }
 
 // メモリストレージ（Redisが使えない場合のフォールバック）
@@ -48,13 +53,17 @@ export async function POST(request) {
 
     let savedToRedis = false;
 
-    // Redisに保存（利用可能な場合）
+    // Redis Cloudに保存（利用可能な場合）
     if (redis) {
       try {
-        await redis.set(`lp:${id}`, JSON.stringify(lpData), {
-          ex: expirationSeconds,
-        });
-        console.log('✅ LP saved to Redis successfully');
+        // Redis Cloudに保存（有効期限付き）
+        await redis.set(
+          `lp:${id}`, 
+          JSON.stringify(lpData), 
+          'EX', 
+          expirationSeconds
+        );
+        console.log('✅ LP saved to Redis Cloud successfully');
         console.log('Key:', `lp:${id}`);
         savedToRedis = true;
       } catch (redisError) {
@@ -82,14 +91,14 @@ export async function POST(request) {
     const shareUrl = `${baseUrl}/lp/${id}`;
 
     console.log('📤 Share URL:', shareUrl);
-    console.log('💾 Storage:', savedToRedis ? 'Redis' : 'Memory');
+    console.log('💾 Storage:', savedToRedis ? 'Redis Cloud' : 'Memory');
 
     return NextResponse.json({
       id,
       url: shareUrl,
       data: lpData,
       expiresIn: '7日間',
-      storage: savedToRedis ? 'Redis' : 'Memory'
+      storage: savedToRedis ? 'Redis Cloud' : 'Memory'
     });
 
   } catch (error) {
@@ -124,5 +133,5 @@ if (!redis) {
   }, 60 * 60 * 1000); // 1時間ごとにクリーンアップ
 }
 
-// GET用のエクスポート（メモリストレージをget-lpで使えるようにする）
-export { memoryStorage };
+// Redisクライアントをエクスポート（他のファイルで使用）
+export { redis, memoryStorage };

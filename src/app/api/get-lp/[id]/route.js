@@ -1,17 +1,7 @@
 import { NextResponse } from 'next/server';
-import { Redis } from '@upstash/redis';
 
-// Upstash Redisクライアントの初期化（環境変数がある場合）
-let redis = null;
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  });
-}
-
-// メモリストレージ（save-lpと共有）
-import { memoryStorage } from '../../save-lp/route.js';
+// save-lpからRedisクライアントとメモリストレージをインポート
+import { redis, memoryStorage } from '../../save-lp/route.js';
 
 export async function GET(request, context) {
   console.log('=== Get LP API Called ===');
@@ -32,18 +22,18 @@ export async function GET(request, context) {
 
     let lpData = null;
 
-    // 1. Redisから取得を試みる
+    // 1. Redis Cloudから取得を試みる
     if (redis) {
       try {
-        console.log('Fetching from Redis...');
+        console.log('Fetching from Redis Cloud...');
         const data = await redis.get(`lp:${id}`);
         
         if (data) {
-          console.log('✅ LP found in Redis');
-          // Redisから取得したデータは既にオブジェクトの場合とJSON文字列の場合がある
-          lpData = typeof data === 'string' ? JSON.parse(data) : data;
+          console.log('✅ LP found in Redis Cloud');
+          // ioredisは文字列を返すので、JSONパースが必要
+          lpData = JSON.parse(data);
         } else {
-          console.log('❌ LP not found in Redis');
+          console.log('❌ LP not found in Redis Cloud');
         }
       } catch (redisError) {
         console.error('Redis fetch error:', redisError);
