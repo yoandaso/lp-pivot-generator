@@ -8,6 +8,9 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
     url: process.env.UPSTASH_REDIS_REST_URL,
     token: process.env.UPSTASH_REDIS_REST_TOKEN,
   });
+  console.log('Redis client initialized');
+} else {
+  console.warn('Redis environment variables not found. Redis will not be available.');
 }
 
 export async function GET(request, { params }) {
@@ -15,40 +18,53 @@ export async function GET(request, { params }) {
     const { id } = params;
     console.log('=== Get LP API Called ===');
     console.log('LP ID:', id);
+    console.log('Redis available:', !!redis);
 
     let lpData = null;
 
-    // Redisから取得を試みる
-    if (redis) {
-      try {
-        const data = await redis.get(`lp:${id}`);
-        if (data) {
-          lpData = typeof data === 'string' ? JSON.parse(data) : data;
-          console.log('LP found in Redis');
-        }
-      } catch (redisError) {
-        console.error('Redis get error:', redisError);
-      }
-    }
-
-    // Redisにない場合、メモリストレージから取得を試みる
-    if (!lpData) {
-      // メモリストレージは同じプロセス内でのみ有効
-      // 本番環境では必ずRedisを使用すること
-      console.log('LP not found in Redis, checking memory storage...');
-      
-      // このAPIルートでは直接メモリにアクセスできないため、
-      // 代わりにlocalStorageを使う（クライアントサイド）
+    // Redisが利用可能かチェック
+    if (!redis) {
+      console.error('Redis is not configured. Cannot retrieve LP.');
       return NextResponse.json(
-        { error: 'LPが見つかりません', id },
-        { status: 404 }
+        { 
+          error: 'ストレージが設定されていません', 
+          details: 'Redis configuration is missing',
+          id 
+        },
+        { status: 500 }
       );
     }
 
-    if (!lpData) {
-      console.log('LP not found:', id);
+    // Redisから取得を試みる
+    try {
+      console.log(`Attempting to get key: lp:${id}`);
+      const data = await redis.get(`lp:${id}`);
+      console.log('Redis response:', data ? 'Data found' : 'No data');
+      
+      if (data) {
+        lpData = typeof data === 'string' ? JSON.parse(data) : data;
+        console.log('LP found in Redis, serviceName:', lpData?.serviceName);
+      }
+    } catch (redisError) {
+      console.error('Redis get error:', redisError);
       return NextResponse.json(
-        { error: 'LPが見つかりません。URLが間違っているか、有効期限が切れています。' },
+        { 
+          error: 'データ取得エラー', 
+          details: redisError.message,
+          id 
+        },
+        { status: 500 }
+      );
+    }
+
+    // データが見つからない場合
+    if (!lpData) {
+      console.log('LP not found in Redis for ID:', id);
+      return NextResponse.json(
+        { 
+          error: 'LPが見つかりません。URLが間違っているか、有効期限（7日間）が切れている可能性があります。',
+          id 
+        },
         { status: 404 }
       );
     }
