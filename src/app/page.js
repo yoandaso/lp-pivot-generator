@@ -467,6 +467,12 @@ const analyzeURL = async () => {
           <p className="text-lg text-gray-600">
             競合サービスを分析して、差別化されたアイデアのLPを自動生成
           </p>
+          <p className="text-lg text-gray-600">
+            2025.11.19:LP生成のクオリティを向上
+          </p>
+          <p className="text-lg text-gray-600">
+            2025.11.19:外部ブラウザから共有URLが表示できないエラーを修正
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
