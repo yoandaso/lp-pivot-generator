@@ -951,6 +951,74 @@ const PivotCard = ({ pivot, onSelect }) => (
       {step === 2 && renderStep2()}
       {step === 2.5 && renderStep2_5()}
       {step === 3 && renderStep3()}
+      {/* 共有URLモーダル */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-2xl font-bold text-gray-900">共有URL</h3>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              以下のURLでLPを共有できます
+            </p>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-900 break-all font-mono">
+                {shareUrl}
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(shareUrl);
+                  alert('URLをコピーしました！');
+                }}
+                className="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+              >
+                URLをコピー
+              </button>
+
+              {navigator.share && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.share({
+                        title: generatedLP?.serviceName || 'LP PIVOT',
+                        text: generatedLP?.catchphrase || '',
+                        url: shareUrl,
+                      });
+                    } catch (error) {
+                      if (error.name !== 'AbortError') {
+                        console.error('Share error:', error);
+                      }
+                    }
+                  }}
+                  className="flex-1 bg-gray-900 text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+                >
+                  共有メニュー
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => window.open(shareUrl, '_blank')}
+              className="w-full mt-3 text-indigo-600 hover:text-indigo-700 py-2 text-sm font-medium"
+            >
+              新しいタブで開く →
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 };
