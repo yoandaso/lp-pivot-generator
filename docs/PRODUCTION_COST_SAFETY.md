@@ -220,9 +220,10 @@ Not executed:
 | EXT-2 | Set a monthly spend limit (and usage alerts) in the Anthropic Console for the workspace/key used as `ANTHROPIC_API_KEY`. Consider a dedicated workspace for this app. | Provider-level ceiling on AI cost, which also covers F-12 | **Yes** | Owner |
 | EXT-3 | Confirm `REDIS_URL` is set for the Production environment in Vercel, so limits are shared across instances. Confirm the Redis Cloud plan is fixed-price with no metered overage and has memory for ≤~450 MB of LPs, or accept that saves fall back to memory once the quota is reached. | Makes rate limits and global caps effective and keeps storage cost bounded | No (high priority) | Owner |
 | EXT-4 | In Vercel Firewall, add a rate-limit rule: `POST` on `/api/analyze`, `/api/pivots`, `/api/generate-lp` and `/api/save-lp`, 10 requests per 60 s per IP → 429/deny. Consider a challenge for `/lp/*` and `/api/get-lp/*` bursts. Start in log mode. Do **not** enable the broad "AI bots" deny template unless blocking OAI-SearchBot and Claude-SearchBot is intended. | Enforcement before a function runs; WAF-mitigated traffic is not billed for CDN requests/transfer | No | Owner |
-| EXT-5 | Confirm DNS for `lp-pivot.com` points directly at Vercel, with no outer CDN/reverse proxy. If one exists, audit the cache chain (§15A) and client-IP forwarding for the limiter. | Cache-chain and IP semantics | No | Owner |
+| EXT-5 | (Likely satisfied: on 2026-09-30 `lp-pivot.com` resolved to 216.198.79.1 and responded with `server: Vercel` and `x-vercel-cache`, which points to no outer CDN; verify in the DNS provider.) Confirm DNS for `lp-pivot.com` points directly at Vercel, with no outer CDN/reverse proxy. If one exists, audit the cache chain (§15A) and client-IP forwarding for the limiter. | Cache-chain and IP semantics | No | Owner |
 | EXT-6 | If `/api/test-env` was reachable in production (it was public on HEAD `8c4530f`), rotate the Redis Cloud password and any Upstash/KV tokens whose 20-character prefixes may have been exposed. | Credential exposure from a debug endpoint | No (security) | Owner |
-| EXT-7 | Review, commit and deploy these changes. This audit made no commit, push or deployment. | The fixes are not live until deployed | **Yes** | Owner |
+| EXT-7 | ~~Commit and deploy~~ **DONE 2026-09-30**: `7df453e` + `68a6fba` deployed to production via Vercel Git integration. The first deploy was rejected by Vercel's vulnerable-Next.js block, so Next was upgraded 16.0.1 → 16.0.11 and React 19.2.0 → 19.2.8. | — | Closed | — |
+| EXT-9 | `npm audit` still reports Next.js advisories for versions ≤16.3.2 (image optimizer, rewrites, PPR, Server Actions CSRF). Plan a minor upgrade to a patched 16.x. | Security hygiene; most items do not apply (no `next/image` remotePatterns, rewrites, PPR or Server Actions) | No | Owner |
 | EXT-8 | Optional: set the `AI_DAILY_CAP` env var to tune the global AI cap (default 1000/day). | Tunable ceiling | No | Owner |
 
 ## Remaining risks
@@ -233,6 +234,16 @@ Not executed:
 - Many distinct IPs can each use their per-IP quota. The global cap is the backstop for AI calls and saves; it does not cover `/api/log` or `/api/generate-html`, which are cheap and bounded per request.
 - `claude-3-5-haiku-20241022` may be deprecated by the provider. That is a functional risk, not a cost risk, and was left unchanged to avoid altering product behavior.
 - F-11 and F-14 are left open as owner decisions.
+
+## Production verification (2026-09-30, after deploy)
+
+- `/` 200, 19,399 B, `x-vercel-cache: HIT`
+- `/robots.txt` serves the policy above
+- `/api/test-env`, `/api/test-redis`, `/api/debug-lp/x` → 404
+- `/api/get-lp/<invalid>` → 404
+- `/api/analyze` with a metadata IP → 400
+- `/api/pivots` with an invalid body → 400 (no provider call)
+- `/lp/abc123`: MISS on the first request, then `x-vercel-cache: HIT` (ISR)
 
 ## Changed files
 
