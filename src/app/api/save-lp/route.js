@@ -1,25 +1,6 @@
 import { NextResponse } from 'next/server';
-import Redis from 'ioredis';
-
-// Redis Cloud クライアントの初期化（環境変数がある場合）
-let redis = null;
-if (process.env.REDIS_URL) {
-  redis = new Redis(process.env.REDIS_URL, {
-    // エラー時の再接続設定
-    retryStrategy(times) {
-      const delay = Math.min(times * 50, 2000);
-      return delay;
-    },
-    // 接続タイムアウト
-    connectTimeout: 10000,
-  });
-  console.log('✅ Redis Cloud client initialized');
-} else {
-  console.warn('⚠️ REDIS_URL not found, using memory storage');
-}
-
-// メモリストレージ（Redisが使えない場合のフォールバック）
-const memoryStorage = new Map();
+import { redis, memoryStorage } from '../../../lib/redis.js';
+import { enforceRateLimit, enforceGlobalCap, readJsonBody, BODY_LIMITS } from '../../../lib/costGuards.js';
 
 // ランダムIDを生成
 function generateId() {
@@ -31,16 +12,24 @@ export async function POST(request) {
   try {
     console.log('=== Save LP API Called ===');
     
-    const lpData = await request.json();
+    const limited = await enforceRateLimit(redis, request, 'saveLp');
+    if (limited) return limited;
+
+    const parsed = await readJsonBody(request, BODY_LIMITS.lpData);
+    if (parsed.response) return parsed.response;
+    const lpData = parsed.data;
     
     // データ検証
     if (!lpData || !lpData.serviceName) {
-      console.error('Invalid LP data:', lpData);
+      console.error('Invalid LP data');
       return NextResponse.json(
         { error: '無効なLPデータです', details: 'serviceName is required' },
         { status: 400 }
       );
     }
+
+    const capped = await enforceGlobalCap(redis, 'saveLpGlobal');
+    if (capped) return capped;
 
     // ユニークIDを生成
     const id = generateId();
@@ -132,6 +121,3 @@ if (!redis) {
     }
   }, 60 * 60 * 1000); // 1時間ごとにクリーンアップ
 }
-
-// Redisクライアントをエクスポート（他のファイルで使用）
-export { redis, memoryStorage };

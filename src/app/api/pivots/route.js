@@ -1,17 +1,51 @@
 import { NextResponse } from 'next/server';
+import { redis } from '../../../lib/redis.js';
+import { enforceRateLimit, enforceAiGlobalCap, readJsonBody, clampText, clampList, BODY_LIMITS } from '../../../lib/costGuards.js';
+import { createAnthropicClient, callClaudeWithRetry } from '../../../lib/anthropic.js';
+
+export const maxDuration = 120;
+
+// プロンプトに入れる分析結果を長さ・件数の上限付きで正規化
+function normalizeAnalyzed(input) {
+  if (!input || typeof input !== 'object' || !input.serviceName) return null;
+  return {
+    serviceName: clampText(input.serviceName, 200),
+    category: clampText(input.category, 200),
+    features: clampList(input.features, 10, 300),
+    targetCustomer: clampText(input.targetCustomer, 500),
+    valueProposition: clampText(input.valueProposition, 1000),
+    customerAnalysis: {
+      strengths: clampList(input.customerAnalysis?.strengths, 10, 500),
+      challenges: clampList(input.customerAnalysis?.challenges, 10, 500),
+    },
+    serviceAnalysis: {
+      strengths: clampList(input.serviceAnalysis?.strengths, 10, 500),
+      challenges: clampList(input.serviceAnalysis?.challenges, 10, 500),
+    },
+  };
+}
 
 export async function POST(request) {
   try {
-    const { analyzed } = await request.json();
-    
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
+    const limited = await enforceRateLimit(redis, request, 'ai');
+    if (limited) return limited;
+
+    const parsed = await readJsonBody(request, BODY_LIMITS.pivots);
+    if (parsed.response) return parsed.response;
+
+    const analyzed = normalizeAnalyzed(parsed.data?.analyzed);
+    if (!analyzed) {
+      return NextResponse.json(
+        { error: '必要な情報が不足しています' },
+        { status: 400 }
+      );
+    }
+
+    const capped = await enforceAiGlobalCap(redis);
+    if (capped) return capped;
+
+    const anthropic = createAnthropicClient({ timeoutMs: 90000 });
+    const data = await callClaudeWithRetry(anthropic, {
         model: 'claude-3-5-haiku-20241022',
         max_tokens: 3000,
         messages: [{
@@ -102,10 +136,8 @@ ${analyzed.serviceAnalysis.challenges.join('\n- ')}
   ]
 }`
         }]
-      })
     });
 
-    const data = await response.json();
     const content = data.content[0].text.trim();
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     const result = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);

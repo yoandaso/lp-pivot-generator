@@ -1,31 +1,15 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
+import { redis } from '../../../lib/redis.js';
+import { enforceRateLimit, enforceAiGlobalCap, readJsonBody, clampText, BODY_LIMITS } from '../../../lib/costGuards.js';
+import { createAnthropicClient, callClaudeWithRetry, isOverloadedError } from '../../../lib/anthropic.js';
 
-async function callClaudeWithRetry(anthropic, messages, maxRetries = 5) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      console.log(`Attempt ${i + 1}/${maxRetries}`);
-      
-      const message = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-20241022',
-        max_tokens: 8000,
-        messages,
-      });
-      
-      return message;
-    } catch (error) {
-      console.error(`Attempt ${i + 1} failed:`, error.message);
-      
-      if (error.error?.type === 'overloaded_error' && i < maxRetries - 1) {
-        const waitTime = Math.pow(2, i) * 5000;
-        console.log(`Waiting ${waitTime}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        continue;
-      }
-      
-      throw error;
-    }
-  }
+export const maxDuration = 300;
+
+// プロンプトに入れるピボット案を長さの上限付きで正規化
+function normalizePivot(input) {
+  if (!input || typeof input !== 'object') return null;
+  const json = JSON.stringify(input);
+  return json.length > 8000 ? null : input;
 }
 
 export async function POST(request) {
@@ -39,7 +23,15 @@ export async function POST(request) {
       );
     }
 
-    const { serviceName, targetCustomer, selectedPivot } = await request.json();
+    const limited = await enforceRateLimit(redis, request, 'ai');
+    if (limited) return limited;
+
+    const parsed = await readJsonBody(request, BODY_LIMITS.generateLp);
+    if (parsed.response) return parsed.response;
+
+    const serviceName = clampText(parsed.data?.serviceName, 200);
+    const targetCustomer = clampText(parsed.data?.targetCustomer, 500);
+    const selectedPivot = normalizePivot(parsed.data?.selectedPivot);
     console.log('Generating LP for:', serviceName);
 
     if (!serviceName || !targetCustomer || !selectedPivot) {
@@ -49,11 +41,15 @@ export async function POST(request) {
       );
     }
 
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    const capped = await enforceAiGlobalCap(redis);
+    if (capped) return capped;
 
-    const message = await callClaudeWithRetry(anthropic, [
+    const anthropic = createAnthropicClient({ timeoutMs: 240000 });
+
+    const message = await callClaudeWithRetry(anthropic, {
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 8000,
+      messages: [
       {
         role: 'user',
         content: `あなたは世界トップクラスのマーケティングストラテジスト兼コピーライターです。深い顧客理解に基づき、一貫性があり説得力の高いランディングページを生成してください。
@@ -261,7 +257,8 @@ export async function POST(request) {
 
 **重要**: JSONのみを返してください。マークダウンのコードブロック記号は不要です。純粋なJSONオブジェクトのみを出力してください。`,
       },
-    ]);
+    ],
+    });
 
     const responseText = message.content[0].text;
     let jsonText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -275,7 +272,7 @@ export async function POST(request) {
     console.error('=== Generate LP Error ===');
     console.error('Error:', error.message);
 
-    if (error.error && error.error.type === 'overloaded_error') {
+    if (isOverloadedError(error)) {
       return NextResponse.json(
         { error: 'APIが一時的に過負荷状態です。30秒後に再度お試しください。' },
         { status: 503 }

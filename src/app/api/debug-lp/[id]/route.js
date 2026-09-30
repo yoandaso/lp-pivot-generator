@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
+import { debugRouteGuard } from '../../../../lib/costGuards.js';
 
 export async function GET(request, context) {
+  // 本番環境では無効（環境変数の露出・外部書き込みを防ぐ）
+  const blocked = debugRouteGuard();
+  if (blocked) return blocked;
+
   console.log('=== Debug LP API Called ===');
   
   try {

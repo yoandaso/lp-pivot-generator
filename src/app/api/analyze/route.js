@@ -1,73 +1,25 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
+import { redis } from '../../../lib/redis.js';
+import { enforceRateLimit, enforceAiGlobalCap, readJsonBody, BODY_LIMITS } from '../../../lib/costGuards.js';
+import { createAnthropicClient, callClaudeWithRetry, isOverloadedError } from '../../../lib/anthropic.js';
+import { fetchExternalPage, getOwnHosts, validateTargetUrl } from '../../../lib/safeFetch.js';
 
-async function callClaudeWithRetry(anthropic, messages, maxRetries = 5) {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      console.log(`Attempt ${i + 1}/${maxRetries}`);
-      
-      const message = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-20241022', // ✅ Haikuモデルを使用
-        max_tokens: 4000,
-        messages,
-      });
-      
-      return message;
-    } catch (error) {
-      console.error(`Attempt ${i + 1} failed:`, error.message);
-      
-      if (error.error?.type === 'overloaded_error' && i < maxRetries - 1) {
-        const waitTime = Math.pow(2, i) * 5000;
-        console.log(`Waiting ${waitTime}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-        continue;
-      }
-      
-      throw error;
-    }
-  }
-}
+export const maxDuration = 120;
 
-// URLのコンテンツをフェッチする関数
-async function fetchWebContent(url) {
+// URLのコンテンツをフェッチする関数（SSRF・自サイト・サイズ・リダイレクト上限付き）
+async function fetchWebContent(url, ownHosts) {
   try {
     console.log('Fetching URL content:', url);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
-    
-    try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
-        },
-        signal: controller.signal,
-        redirect: 'follow',
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const html = await response.text();
-      console.log(`Fetched ${html.length} characters from URL`);
-      
-      return html;
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      throw fetchError;
-    }
+    const html = await fetchExternalPage(url, { ownHosts });
+    console.log(`Fetched ${html.length} characters from URL`);
+    return html;
   } catch (error) {
     console.error('Error fetching URL:', error.message);
-    
-    if (error.name === 'AbortError') {
+
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
       throw new Error('URLの取得がタイムアウトしました（15秒以内に応答がありませんでした）');
     }
-    
+
     throw new Error(`URLの取得に失敗しました: ${error.message}`);
   }
 }
@@ -84,18 +36,14 @@ export async function POST(request) {
       );
     }
 
-    let body;
-    try {
-      body = await request.json();
-    } catch (e) {
-      console.error('Failed to parse request body:', e);
-      return NextResponse.json(
-        { error: 'リクエストボディのパースに失敗しました' },
-        { status: 400 }
-      );
-    }
+    const limited = await enforceRateLimit(redis, request, 'ai');
+    if (limited) return limited;
 
-    const { url } = body;
+    const parsed = await readJsonBody(request, BODY_LIMITS.analyze);
+    if (parsed.response) return parsed.response;
+    const body = parsed.data;
+
+    const url = body?.url;
     console.log('Analyzing URL:', url);
 
     if (!url) {
@@ -106,18 +54,11 @@ export async function POST(request) {
     }
 
     // URLの検証
-    try {
-      const parsedUrl = new URL(url);
-      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-        return NextResponse.json(
-          { error: 'httpまたはhttpsのURLを入力してください' },
-          { status: 400 }
-        );
-      }
-    } catch (e) {
-      console.error('Invalid URL:', e);
+    const ownHosts = getOwnHosts(request);
+    const checked = validateTargetUrl(url, ownHosts);
+    if (checked.error) {
       return NextResponse.json(
-        { error: '有効なURLを入力してください' },
+        { error: checked.error },
         { status: 400 }
       );
     }
@@ -125,7 +66,7 @@ export async function POST(request) {
     // URLのコンテンツを取得
     let webContent;
     try {
-      webContent = await fetchWebContent(url);
+      webContent = await fetchWebContent(url, ownHosts);
       
       if (!webContent || webContent.trim().length === 0) {
         return NextResponse.json(
@@ -149,13 +90,17 @@ export async function POST(request) {
       webContent = webContent.substring(0, maxLength) + '\n\n[... 以降省略 ...]';
     }
 
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    const capped = await enforceAiGlobalCap(redis);
+    if (capped) return capped;
+
+    const anthropic = createAnthropicClient({ timeoutMs: 90000 });
 
     console.log('Calling Claude API with retry...');
 
-    const message = await callClaudeWithRetry(anthropic, [
+    const message = await callClaudeWithRetry(anthropic, {
+      model: 'claude-3-5-haiku-20241022', // ✅ Haikuモデルを使用
+      max_tokens: 4000,
+      messages: [
       {
         role: 'user',
         content: `あなたは、市場・競合分析能力に長けたベンチャーキャピタリスト兼経営戦略コンサルタントです。以下のサービスのWebページを分析して、JSON形式で情報を抽出してください。
@@ -191,7 +136,8 @@ ${webContent}
 
 重要: 必ず有効なJSONのみを返してください。マークダウンのコードブロック記号は不要です。`,
       },
-    ]);
+    ],
+    });
 
     console.log('Claude API response received');
 
@@ -254,7 +200,7 @@ ${webContent}
       console.error('Anthropic API error:', error.error);
     }
 
-    if (error.error?.type === 'overloaded_error') {
+    if (isOverloadedError(error)) {
       return NextResponse.json(
         {
           error: 'Anthropic APIが一時的に過負荷状態です。30秒後に再度お試しください。',

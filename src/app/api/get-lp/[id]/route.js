@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 
-// save-lpからRedisクライアントとメモリストレージをインポート
-import { redis, memoryStorage } from '../../save-lp/route.js';
+import { redis, memoryStorage } from '../../../../lib/redis.js';
+
+// 保存済みLPは不変（7日で失効）なので CDN で短時間キャッシュする
+const CACHE_HEADERS = { 'Cache-Control': 'public, max-age=0, s-maxage=3600' };
+const ID_PATTERN = /^[a-z0-9]{1,32}$/;
 
 export async function GET(request, context) {
   console.log('=== Get LP API Called ===');
@@ -13,10 +16,10 @@ export async function GET(request, context) {
     
     console.log('Fetching LP with ID:', id);
     
-    if (!id) {
+    if (!id || !ID_PATTERN.test(id)) {
       return NextResponse.json(
-        { error: 'ID parameter missing' },
-        { status: 400 }
+        { error: 'LPが見つかりません' },
+        { status: 404 }
       );
     }
 
@@ -80,7 +83,7 @@ export async function GET(request, context) {
 
     console.log('✅ LP retrieved successfully:', lpData.serviceName);
     
-    return NextResponse.json(lpData);
+    return NextResponse.json(lpData, { headers: CACHE_HEADERS });
 
   } catch (error) {
     console.error('=== Get LP Error ===');

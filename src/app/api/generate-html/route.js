@@ -1,10 +1,17 @@
 // app/api/generate-html/route.js
 import { NextResponse } from 'next/server';
 import { generateLPHTML } from '@/lib/generateLPHTML';
+import { redis } from '../../../lib/redis.js';
+import { enforceRateLimit, readJsonBody, BODY_LIMITS } from '../../../lib/costGuards.js';
 
 export async function POST(request) {
   try {
-    const lpData = await request.json();
+    const limited = await enforceRateLimit(redis, request, 'generateHtml');
+    if (limited) return limited;
+
+    const parsed = await readJsonBody(request, BODY_LIMITS.lpData);
+    if (parsed.response) return parsed.response;
+    const lpData = parsed.data;
 
     if (!lpData || !lpData.serviceName) {
       return NextResponse.json(
